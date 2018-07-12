@@ -406,7 +406,7 @@ public class MainActivity extends AppCompatActivity {
                 picturesView = new ImageView(context);
                 picturesView.setScaleType(ImageView.ScaleType.FIT_CENTER);
                 picturesView
-                        .setLayoutParams(new GridView.LayoutParams(270, 270));
+                        .setLayoutParams(new GridView.LayoutParams(GridView.LayoutParams.WRAP_CONTENT, 500));
 
             } else {
                 picturesView = (ImageView) convertView;
