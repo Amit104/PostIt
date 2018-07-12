@@ -18,6 +18,7 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
@@ -35,21 +36,24 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
 
     Button ChoosePhoto,Process;
     GridView display;
+    int counter;
     ArrayList<Uri> imageUri = new ArrayList<Uri>();
-
+    ArrayList< Pair<String, Double> > scoreList = new ArrayList<>();
     private static final int PICK_FROM_GALLERY = 1;
     private final String apiEndpoint = "https://westcentralus.api.cognitive.microsoft.com/face/v1.0";
     private final String subscriptionKey = "d7502ded756743e5bd3c20227b188a44";
 
     private final FaceServiceClient faceServiceClient =
             new FaceServiceRestClient(apiEndpoint, subscriptionKey);
-
+    Face[] faces;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -65,27 +69,28 @@ public class MainActivity extends AppCompatActivity {
                     if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                         ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, PICK_FROM_GALLERY);
                     } else {
-
+                        imageUri.clear();
+                        Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+                        String today = new SimpleDateFormat("yyyyMMdd").format(new Date());
+                        Log.d("Date", today);
+                        Cursor cursor = getContentResolver().query(uri, new String[]{MediaStore.Images.Media.DATA}, null, null, MediaStore.Images.Media.DATE_ADDED + " ASC");
+                        if (cursor != null) {
+                            while (cursor.moveToNext()) {
+                                if (Uri.parse(cursor.getString(0)).toString().contains(today)) {
+                                    imageUri.add(Uri.parse(cursor.getString(0)));
+                                }
+                            }
+                            cursor.close();
+                        }
+                        for (Uri i : imageUri)
+                            Log.d("Photo", i.toString());
+                        display.setAdapter(new ImageAdapter(MainActivity.this));
+                        Process.setEnabled(true);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                imageUri.clear();
-                Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
-                String today = new SimpleDateFormat("yyyyMMdd").format(new Date());
-                Log.d("Date", today);
-                Cursor cursor = getContentResolver().query(uri, new String[]{MediaStore.Images.Media.DATA}, null, null, MediaStore.Images.Media.DATE_ADDED + " ASC");
-                if (cursor != null) {
-                    while (cursor.moveToNext()) {
-                        if (Uri.parse(cursor.getString(0)).toString().contains(today)) {
-                            imageUri.add(Uri.parse(cursor.getString(0)));
-                        }
-                    }
-                    cursor.close();
-                }
-                for (Uri i : imageUri)
-                    Log.d("Photo", i.toString());
-                display.setAdapter(new ImageAdapter(MainActivity.this));
+
             }
         });
 
@@ -98,26 +103,29 @@ public class MainActivity extends AppCompatActivity {
                 }
                 else
                 {
+                    Process.setEnabled(false);
+                    counter=0;
                     for(Uri i : imageUri)
                     {
                         Bitmap image = BitmapFactory.decodeFile(i.toString());
-                        detectAndFrame(image);
-                        Log.d("API","Worked for " + i.toString());
+                        detectAndFrame(image, i.toString());
                     }
+                    //while(counter!=imageUri.size()){}
 
                 }
             }
         });
     }
 
+
     // Detect faces by uploading a face image.
     // Frame faces after detection.
-    private void detectAndFrame(final Bitmap imageBitmap) {
+    private void detectAndFrame(final Bitmap imageBitmap, final String path) {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        imageBitmap.compress(Bitmap.CompressFormat.JPEG, 25, outputStream);
+        imageBitmap.compress(Bitmap.CompressFormat.JPEG, 30, outputStream);
         ByteArrayInputStream inputStream =
                 new ByteArrayInputStream(outputStream.toByteArray());
-        /*FileOutputStream out = null;
+        FileOutputStream out = null;
         try {
             out = new FileOutputStream("/storage/emulated/0/DCIM/output.jpg");
             imageBitmap.compress(Bitmap.CompressFormat.JPEG, 30, out); // bmp is your Bitmap instance
@@ -132,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }*/
+        }
         Log.d("API","[START]");
         AsyncTask<InputStream, String, Face[]> detectTask =
                 new AsyncTask<InputStream, String, Face[]>() {
@@ -146,11 +154,15 @@ public class MainActivity extends AppCompatActivity {
                                     params[0],
                                     true,         // returnFaceId
                                     false,        // returnFaceLandmarks
-                                    null          // returnFaceAttributes:
-                                /* new FaceServiceClient.FaceAttributeType[] {
-                                    FaceServiceClient.FaceAttributeType.Age,
-                                    FaceServiceClient.FaceAttributeType.Gender }
-                                */
+                                    new FaceServiceClient.FaceAttributeType[] {
+                                        FaceServiceClient.FaceAttributeType.Age,
+                                        FaceServiceClient.FaceAttributeType.Gender,
+                                        FaceServiceClient.FaceAttributeType.Smile,
+                                        FaceServiceClient.FaceAttributeType.Emotion,
+                                        FaceServiceClient.FaceAttributeType.Exposure,
+                                        FaceServiceClient.FaceAttributeType.Blur,
+                                        FaceServiceClient.FaceAttributeType.Occlusion }
+
                             );
                             if (result == null){
                                 publishProgress(
@@ -180,11 +192,56 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     protected void onPostExecute(Face[] result) {
                         //TODO: update face frames
-                        Log.d("Results",result.toString());
+                        Log.d("FACES", String.valueOf(result.length));
+                        double score = new FaceRanking().rank(result);
+                        Log.d("Scores : ", String.valueOf(score));
+                        scoreList.add(new Pair<String, Double>(path,score));
+                        counter++;
+                        if(counter==imageUri.size())
+                        {
+                            Process.setEnabled(true);
+                            for(Pair<String, Double> res : scoreList)
+                            {
+                                Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
+                            }
+
+                            // logic for ranking and captioning
+                            scoreList.sort(new Comparator<Pair<String, Double>>() {
+
+                                @Override
+                                public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
+                                    if (o1.second > o2.second) {
+                                        return -1;
+                                    } else if (o1.second.equals(o2.second)) {
+                                        return 0; // You can change this to make it then look at the
+                                        //words alphabetical order
+                                    } else {
+                                        return 1;
+                                    }
+                                }
+                            });
+                            imageUri.clear();
+                            for(Pair<String, Double> res : scoreList)
+                            {
+                                Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
+                                imageUri.add(Uri.parse(res.first));
+                            }
+
+                            display.setAdapter(new ImageAdapter(MainActivity.this));
+
+                            // vision API
+                            
+                        }
                     }
                 };
 
-        detectTask.execute(inputStream);
+        try {
+            detectTask.execute(inputStream).get();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        }
     }
 
     private void showError(String message) {
