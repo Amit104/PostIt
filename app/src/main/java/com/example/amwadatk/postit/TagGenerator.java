@@ -1,13 +1,22 @@
 package com.example.amwadatk.postit;
 
 import android.app.ProgressDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.ExifInterface;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.app.Activity;
+import android.os.StrictMode;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -27,6 +36,7 @@ import com.microsoft.projectoxford.vision.rest.VisionServiceException;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 
 
@@ -34,29 +44,88 @@ public class TagGenerator extends Activity {
 
     ImageView tagImage;
     EditText tags;
-    String path;
+    String path,tagstext;
     LinearLayout linearLayout;
     private Bitmap mBitmap;
     private VisionServiceClient client;
-
-    @Override
+    Button shareimage;
+    RadioButton[] rb;
+    int currentquote ;
+        @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_tag_generator);
+        StrictMode.VmPolicy.Builder newbuilder = new StrictMode.VmPolicy.Builder();
+        StrictMode.setVmPolicy(newbuilder.build());
         path = getIntent().getStringExtra("path");
         Log.d("MSG",getIntent().getStringExtra("path"));
         tagImage = findViewById(R.id.tagImage);
+        tags = findViewById(R.id.tags);
+        currentquote =0;
+        tagstext="";
+        tags.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void afterTextChanged(Editable s)
+            {
+                    String changed = tags.getText().toString();
+                    if(changed.contains(tagstext)==false)
+                    {
+                        RadioButton  rb = findViewById(currentquote);
+                        tagstext = tagstext.substring(0,changed.indexOf(rb.getText().toString()));
+                    }
+            }
+
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                // TODO Auto-generated method stub
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count)
+            {
+
+            }
+        });
         linearLayout = findViewById(R.id.tags_quotes);
         LinearLayout layout = new LinearLayout(this);
         layout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        tags = findViewById(R.id.tags);
-        final RadioButton[] rb = new RadioButton[5];
-        RadioGroup rg = new RadioGroup(this); //create the RadioGroup
-        rg.setOrientation(RadioGroup.VERTICAL);//or RadioGroup.VERTICAL
-        for(int i=0; i<5; i++){
+
+        rb = new RadioButton[5];
+        RadioGroup rg = new RadioGroup(this);
+        rg.setOrientation(RadioGroup.VERTICAL);
+        rg.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener()
+        {
+            @Override
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                RadioButton rb=(RadioButton)findViewById(checkedId);
+                currentquote = checkedId;
+                tags.setText(tagstext + " " +rb.getText().toString());
+            }
+        });
+        shareimage = findViewById(R.id.shareimage);
+        View.OnClickListener shareimg = new View.OnClickListener() {
+            @Override
+            public void onClick(View v)
+            {
+                final Intent intent = new Intent(     android.content.Intent.ACTION_SEND);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(new File(path)));
+                intent.setType("image/jpeg");
+                ClipboardManager myClipboard;
+                myClipboard = (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+                ClipData myClip;
+                String text = tags.getText().toString();
+                myClip = ClipData.newPlainText("text", text);
+                myClipboard.setPrimaryClip(myClip);
+                startActivity(intent);
+            }
+        };
+        shareimage.setOnClickListener(shareimg);
+        for(int i=0; i<5; i++)
+        {
             rb[i]  = new RadioButton(this);
             rb[i].setText("Quote" + i);
-            rb[i].setId(i + 100);
+            rb[i].setId(i);
             rg.addView(rb[i]);
         }
         layout.addView(rg);//you add the whole
@@ -155,6 +224,7 @@ public class TagGenerator extends Activity {
 
                 tags.append("\n");
                 int faceCount = 0;
+                tagstext =tags.getText().toString();
             }
             if (dialog.isShowing()) {
                 dialog.dismiss();
