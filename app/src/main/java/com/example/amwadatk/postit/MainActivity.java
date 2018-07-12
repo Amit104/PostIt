@@ -3,6 +3,7 @@ package com.example.amwadatk.postit;
 import android.Manifest;
 import android.app.Activity;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import com.microsoft.projectoxford.face.*;
@@ -53,7 +54,7 @@ public class MainActivity extends AppCompatActivity {
 
     private final FaceServiceClient faceServiceClient =
             new FaceServiceRestClient(apiEndpoint, subscriptionKey);
-    Face[] faces;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -230,7 +231,7 @@ public class MainActivity extends AppCompatActivity {
                             display.setAdapter(new ImageAdapter(MainActivity.this));
 
                             // vision API
-                            
+
                         }
                     }
                 };
@@ -288,7 +289,14 @@ public class MainActivity extends AppCompatActivity {
 
             Glide.with(context).load(imageUri.get(position).toString())
                     .into(picturesView);
-
+            picturesView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    Intent i = new Intent(MainActivity.this,TagGenerator.class);
+                    i.putExtra("path",imageUri.get(position).toString());
+                    startActivity(i);
+                }
+            });
             return picturesView;
         }
     }
