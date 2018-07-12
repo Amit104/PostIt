@@ -8,24 +8,92 @@
     android:weightSum="15"
     tools:context=".MainActivity">
 
-    <FrameLayout
-        xmlns:android="http://schemas.android.com/apk/res/android"
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_weight="14"
         android:layout_height="match_parent">
 
-        <GridView
-            android:id="@+id/display"
+        <LinearLayout
+            xmlns:android="http://schemas.android.com/apk/res/android"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:columnWidth="400dp"
-            android:gravity="center"
-            android:horizontalSpacing="0dp"
-            android:numColumns="2"
-            android:padding="0dp"
-            android:stretchMode="columnWidth"
-            android:verticalSpacing="0dp" />
-    </FrameLayout>
+            android:orientation="vertical"
+            android:layout_height="match_parent">
+
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="All"
+                style="?android:attr/listSeparatorTextViewStyle"/>
+
+            <com.example.amwadatk.postit.ExpandableHeightGridView
+                android:id="@+id/displayAll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnWidth="400dp"
+                android:gravity="center"
+                android:horizontalSpacing="0dp"
+                android:numColumns="2"
+                android:padding="0dp"
+                android:stretchMode="columnWidth"
+                android:verticalSpacing="0dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Single"
+                style="?android:attr/listSeparatorTextViewStyle"/>
+
+            <com.example.amwadatk.postit.ExpandableHeightGridView
+                android:id="@+id/displaySingle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnWidth="400dp"
+                android:gravity="center"
+                android:horizontalSpacing="0dp"
+                android:numColumns="2"
+                android:padding="0dp"
+                android:stretchMode="columnWidth"
+                android:verticalSpacing="0dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Group"
+                style="?android:attr/listSeparatorTextViewStyle"/>
+
+            <com.example.amwadatk.postit.ExpandableHeightGridView
+                android:id="@+id/displayGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnWidth="400dp"
+                android:gravity="center"
+                android:horizontalSpacing="0dp"
+                android:numColumns="2"
+                android:padding="0dp"
+                android:stretchMode="columnWidth"
+                android:verticalSpacing="0dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="View"
+                style="?android:attr/listSeparatorTextViewStyle"/>
+
+            <com.example.amwadatk.postit.ExpandableHeightGridView
+                android:id="@+id/displayView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnWidth="400dp"
+                android:gravity="center"
+                android:horizontalSpacing="0dp"
+                android:numColumns="2"
+                android:padding="0dp"
+                android:stretchMode="columnWidth"
+                android:verticalSpacing="0dp" />
+
+        </LinearLayout>
+    </ScrollView>
 
     <ProgressBar
         android:id="@+id/progressbar"

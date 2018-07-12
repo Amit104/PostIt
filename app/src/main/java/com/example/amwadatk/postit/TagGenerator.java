@@ -3,6 +3,8 @@ package com.example.amwadatk.postit;
 import android.app.ProgressDialog;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.location.Address;
+import android.location.Geocoder;
 import android.media.ExifInterface;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -28,6 +30,8 @@ import org.apache.commons.io.output.ByteArrayOutputStream;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.List;
+import java.util.Locale;
 
 
 public class TagGenerator extends Activity {
@@ -38,6 +42,7 @@ public class TagGenerator extends Activity {
     LinearLayout linearLayout;
     private Bitmap mBitmap;
     private VisionServiceClient client;
+    String cityName = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -98,6 +103,10 @@ public class TagGenerator extends Activity {
             if (exifInterface.getLatLong(latLong)) {
                 Log.d("LAT",String.valueOf(latLong[0]));
                 Log.d("LONG",String.valueOf(latLong[1]));
+                Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+                List<Address> addresses = geocoder.getFromLocation(latLong[0], latLong[1], 1);
+                cityName = "#" + addresses.get(0).getLocality();
+                Log.d("CITY",cityName);
             }
         } catch (IOException e) {
             Log.d("ERROR","Couldn't read exif info: " + e.getLocalizedMessage());
@@ -143,16 +152,11 @@ public class TagGenerator extends Activity {
                 Gson gson = new Gson();
                 AnalysisResult result = gson.fromJson(data, AnalysisResult.class);
 
-
+                tags.append(cityName+" ");
                 for (Tag tag: result.tags) {
                     tags.append("#" + tag.name + " " );
                     //write logic for captions
                 }
-                tags.append("\n");
-                for (Caption d : result.description.captions){
-                    tags.append(" " + d.text + " ");
-                }
-
                 tags.append("\n");
                 int faceCount = 0;
             }
