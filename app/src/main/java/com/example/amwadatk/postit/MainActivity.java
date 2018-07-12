@@ -2,6 +2,7 @@ package com.example.amwadatk.postit;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -22,10 +23,14 @@ import android.util.Log;
 import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.GridView;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
@@ -46,12 +51,12 @@ public class MainActivity extends AppCompatActivity {
     Button ChoosePhoto,Process;
     GridView display;
     int counter;
+    ProgressBar progressBar;
     ArrayList<Uri> imageUri = new ArrayList<Uri>();
     ArrayList< Pair<String, Double> > scoreList = new ArrayList<>();
     private static final int PICK_FROM_GALLERY = 1;
     private final String apiEndpoint = "https://westcentralus.api.cognitive.microsoft.com/face/v1.0";
     private final String subscriptionKey = "d7502ded756743e5bd3c20227b188a44";
-
     private final FaceServiceClient faceServiceClient =
             new FaceServiceRestClient(apiEndpoint, subscriptionKey);
 
@@ -61,8 +66,10 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         ChoosePhoto = findViewById(R.id.chooseButton);
         Process = findViewById(R.id.process);
+        ChoosePhoto.setEnabled(true);
+        progressBar = findViewById(R.id.progressbar);
+        progressBar.setVisibility(View.GONE);
         display = findViewById(R.id.display);
-
         ChoosePhoto.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -87,6 +94,7 @@ public class MainActivity extends AppCompatActivity {
                             Log.d("Photo", i.toString());
                         display.setAdapter(new ImageAdapter(MainActivity.this));
                         Process.setEnabled(true);
+
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -104,14 +112,15 @@ public class MainActivity extends AppCompatActivity {
                 }
                 else
                 {
+                    progressBar.setVisibility(View.VISIBLE);
                     Process.setEnabled(false);
+                    ChoosePhoto.setEnabled(false);
                     counter=0;
                     for(Uri i : imageUri)
                     {
                         Bitmap image = BitmapFactory.decodeFile(i.toString());
                         detectAndFrame(image, i.toString());
                     }
-                    //while(counter!=imageUri.size()){}
 
                 }
             }
@@ -185,6 +194,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     protected void onPreExecute() {
                         //TODO: show progress dialog
+                        progressBar.setVisibility(View.VISIBLE);
                     }
                     @Override
                     protected void onProgressUpdate(String... progress) {
@@ -201,6 +211,7 @@ public class MainActivity extends AppCompatActivity {
                         if(counter==imageUri.size())
                         {
                             Process.setEnabled(true);
+                            ChoosePhoto.setEnabled(true);
                             for(Pair<String, Double> res : scoreList)
                             {
                                 Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
@@ -229,20 +240,12 @@ public class MainActivity extends AppCompatActivity {
                             }
 
                             display.setAdapter(new ImageAdapter(MainActivity.this));
-
-                            // vision API
-
+                            progressBar.setVisibility(View.GONE);
                         }
                     }
                 };
 
-        try {
-            detectTask.execute(inputStream).get();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        }
+        detectTask.execute(inputStream);
     }
 
     private void showError(String message) {
