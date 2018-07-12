@@ -7,17 +7,40 @@
     android:layout_height="match_parent"
     android:weightSum="15"
     tools:context=".TagGenerator">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_weight="1"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="right"
+        android:id="@+id/main"
+        android:weightSum="2">
+    <Button
+        android:id="@+id/shareimage"
+        style="@style/Widget.AppCompat.Button.Colored"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="match_parent"
+        android:text="Share Image!" />
+    </LinearLayout>
+
 
     <ImageView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="12"
+        android:layout_weight="9"
         android:id="@+id/tagImage"/>
 
+<LinearLayout
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:id="@+id/tags_quotes"
+android:orientation="vertical">
     <EditText
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/tags"
-        android:layout_weight="3"
+        android:layout_weight="6"
         />
+</LinearLayout>
 </LinearLayout>

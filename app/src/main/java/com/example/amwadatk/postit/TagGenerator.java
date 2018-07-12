@@ -9,6 +9,9 @@ import android.app.Activity;
 import android.util.Log;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 
 import com.bumptech.glide.Glide;
 import com.google.gson.Gson;
@@ -29,6 +32,7 @@ public class TagGenerator extends Activity {
     ImageView tagImage;
     EditText tags;
     String path;
+    LinearLayout linearLayout;
     private Bitmap mBitmap;
     private VisionServiceClient client;
 
@@ -39,9 +43,25 @@ public class TagGenerator extends Activity {
         path = getIntent().getStringExtra("path");
         Log.d("MSG",getIntent().getStringExtra("path"));
         tagImage = findViewById(R.id.tagImage);
+        linearLayout = findViewById(R.id.tags_quotes);
+        LinearLayout layout = new LinearLayout(this);
+        layout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         tags = findViewById(R.id.tags);
+        final RadioButton[] rb = new RadioButton[5];
+        RadioGroup rg = new RadioGroup(this); //create the RadioGroup
+        rg.setOrientation(RadioGroup.VERTICAL);//or RadioGroup.VERTICAL
+        for(int i=0; i<5; i++){
+            rb[i]  = new RadioButton(this);
+            rb[i].setText("Quote" + i);
+            rb[i].setId(i + 100);
+            rg.addView(rb[i]);
+        }
+        layout.addView(rg);//you add the whole
+        linearLayout.addView(layout,1);
         Glide.with(this).load(path)
                 .into(tagImage);
+
+
         if (client==null){
             client = new VisionServiceRestClient("84b235ebbcbe455f9173f10630cc15aa", "https://westcentralus.api.cognitive.microsoft.com/vision/v1.0");
         }
