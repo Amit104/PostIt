@@ -3,6 +3,7 @@ package com.example.amwadatk.postit;
 import android.app.ProgressDialog;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.ExifInterface;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.app.Activity;
@@ -15,6 +16,8 @@ import com.google.gson.Gson;
 import com.microsoft.projectoxford.vision.VisionServiceClient;
 import com.microsoft.projectoxford.vision.VisionServiceRestClient;
 import com.microsoft.projectoxford.vision.contract.AnalysisResult;
+import com.microsoft.projectoxford.vision.contract.Caption;
+import com.microsoft.projectoxford.vision.contract.Description;
 import com.microsoft.projectoxford.vision.contract.Tag;
 import com.microsoft.projectoxford.vision.rest.VisionServiceException;
 
@@ -55,7 +58,7 @@ public class TagGenerator extends Activity {
 
     private String process() throws VisionServiceException, IOException {
         Gson gson = new Gson();
-        String[] features = {"Tags"};
+        String[] features = {"Tags","Description"};
         String[] details = {};
 
         // Put the image into an input stream for detection.
@@ -68,6 +71,17 @@ public class TagGenerator extends Activity {
 
         String result = gson.toJson(v);
         Log.d("result", result);
+
+        try {
+            final ExifInterface exifInterface = new ExifInterface(path);
+            float[] latLong = new float[2];
+            if (exifInterface.getLatLong(latLong)) {
+                Log.d("LAT",String.valueOf(latLong[0]));
+                Log.d("LONG",String.valueOf(latLong[1]));
+            }
+        } catch (IOException e) {
+            Log.d("ERROR","Couldn't read exif info: " + e.getLocalizedMessage());
+        }
 
         return result;
     }
@@ -102,6 +116,7 @@ public class TagGenerator extends Activity {
             super.onPostExecute(data);
 
             if (e != null) {
+
                 tags.setText("Error: " + e.getMessage());
                 this.e = null;
             } else {
@@ -110,9 +125,13 @@ public class TagGenerator extends Activity {
 
 
                 for (Tag tag: result.tags) {
-                    tags.append("Category: " + tag.name + ", score: " + tag.confidence + "\n");
+                    tags.append("#" + tag.name + " " );
+                    //write logic for captions
                 }
-
+                tags.append("\n");
+                for (Caption d : result.description.captions){
+                    tags.append(" " + d.text + " ");
+                }
 
                 tags.append("\n");
                 int faceCount = 0;
