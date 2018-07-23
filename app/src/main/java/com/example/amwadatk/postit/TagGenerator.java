@@ -13,17 +13,23 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.app.Activity;
+import android.os.Environment;
 import android.os.StrictMode;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.Spinner;
+import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.google.gson.Gson;
@@ -39,16 +45,21 @@ import com.microsoft.projectoxford.vision.rest.VisionServiceException;
 import org.apache.commons.io.TaggedIOException;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Random;
 
 
-public class TagGenerator extends Activity {
+public class TagGenerator extends Activity implements AdapterView.OnItemSelectedListener {
 
     ImageView tagImage;
     EditText tags;
@@ -56,16 +67,21 @@ public class TagGenerator extends Activity {
     LinearLayout linearLayout;
     private Bitmap mBitmap;
     private VisionServiceClient client;
-    String cityName = "";
-    Button shareimage;
+    String cityName = "",category="Life";
+    Button shareimage,refresh;
     RadioButton[] rb;
     RadioGroup rg;
     int currentquote;
+    Spinner dropdown;
+    HashMap<String,List<String>> quotesList = new HashMap<>();
+    List<String> quoteCat;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_tag_generator);
         StrictMode.VmPolicy.Builder newbuilder = new StrictMode.VmPolicy.Builder();
+        dropdown = findViewById(R.id.quoteCategories);
         StrictMode.setVmPolicy(newbuilder.build());
         path = getIntent().getStringExtra("path");
         Log.d("MSG",getIntent().getStringExtra("path"));
@@ -73,6 +89,40 @@ public class TagGenerator extends Activity {
         tags = findViewById(R.id.tags);
         currentquote =0;
         tagstext="";
+
+        try{
+            InputStreamReader is = new InputStreamReader(getAssets()
+                    .open("quotes.csv"));
+
+            BufferedReader reader = new BufferedReader(is);
+            reader.readLine();
+            String line;
+            quoteCat = new ArrayList<>();
+            while ((line = reader.readLine()) != null) {
+                Log.d("LINES",line.split("\t")[0]);
+                String key = line.split("\t")[0];
+                String val = line.split("\t")[1];
+                List<String> tempList;
+                if(quotesList.containsKey(key))
+                {
+                    tempList = quotesList.get(key);
+                }
+                else
+                {
+                    tempList = new ArrayList<>();
+                    quoteCat.add(key);
+                }
+                tempList.add(val);
+                quotesList.put(key,tempList);
+            }
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, quoteCat);
+            dropdown.setAdapter(adapter);
+            dropdown.setOnItemSelectedListener(this);
+        }catch(Exception e){
+            e.printStackTrace();
+            Toast.makeText(this, "The specified file was not found", Toast.LENGTH_SHORT).show();
+        }
+
         tags.addTextChangedListener(new TextWatcher() {
             @Override
             public void afterTextChanged(Editable s)
@@ -113,6 +163,7 @@ public class TagGenerator extends Activity {
             }
         });
         shareimage = findViewById(R.id.shareimage);
+        refresh = findViewById(R.id.refresh);
         View.OnClickListener shareimg = new View.OnClickListener() {
             @Override
             public void onClick(View v)
@@ -132,7 +183,29 @@ public class TagGenerator extends Activity {
             }
         };
         shareimage.setOnClickListener(shareimg);
+        View.OnClickListener refreshquotes = new View.OnClickListener() {
+            @Override
+            public void onClick(View v)
+            {
+                if(quotesList.containsKey(category))
+                {
+                    List<String> quotes = quotesList.get(category);
+                    Random rand = new Random();
+                    rg.removeAllViews();
+                    tags.setText(tagstext);
+                    for(int i=0;i<3;i++)
+                    {
+                        int randnum = rand.nextInt(quotes.size());
+                        rb[i] = new RadioButton(TagGenerator.this);
+                        rb[i].setText(quotes.get(randnum));
+                        rb[i].setId(i);
+                        rg.addView(rb[i]);
+                    }
+                }
+            }
+        };
 
+        refresh.setOnClickListener(refreshquotes);
         layout.addView(rg);//you add the whole
         linearLayout.addView(layout,1);
         Glide.with(this).load(path)
@@ -182,6 +255,31 @@ public class TagGenerator extends Activity {
         }
 
         return result;
+    }
+
+    @Override
+    public void onItemSelected(AdapterView<?> adapterView, View view, int pos, long l) {
+        category = (String) adapterView.getItemAtPosition(pos);
+        if(quotesList.containsKey(category))
+        {
+            List<String> quotes = quotesList.get(category);
+            Random rand = new Random();
+            rg.removeAllViews();
+            tags.setText(tagstext);
+            for(int i=0;i<3;i++)
+            {
+                int randnum = rand.nextInt(quotes.size());
+                rb[i] = new RadioButton(TagGenerator.this);
+                rb[i].setText(quotes.get(randnum));
+                rb[i].setId(i);
+                rg.addView(rb[i]);
+            }
+        }
+    }
+
+    @Override
+    public void onNothingSelected(AdapterView<?> adapterView) {
+
     }
 
     private class doRequest extends AsyncTask<String, String, String> {
@@ -275,7 +373,7 @@ public class TagGenerator extends Activity {
                 Collections.shuffle(outdoor);
                 Collections.shuffle(people);
 
-                if(temp.startsWith("food_")){
+               /* if(temp.startsWith("food_")){
                     for(int i=0; i<3; i++) {
                         rb[i]  = new RadioButton(TagGenerator.this);
                         rb[i].setText(food.get(i));
@@ -306,7 +404,7 @@ public class TagGenerator extends Activity {
                         rb[i].setId(i);
                         rg.addView(rb[i]);
                     }
-                }
+                }*/
                 tagstext =tags.getText().toString();
             }
             if (dialog.isShowing()) {
