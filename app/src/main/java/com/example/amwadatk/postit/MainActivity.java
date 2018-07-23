@@ -106,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
                 Date updated=formatter.parse(lastupdated);
                 Date currenttime = new Date();
                 long diff = currenttime.getTime() - updated.getTime();
-                long diffhours = diff  /(60*60 1000) ;
+                long diffhours = diff  /(60*60*1000) ;
                 if(diffhours>23)
                 {
                     Log.d("API from home","API home");
