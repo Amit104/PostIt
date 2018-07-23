@@ -274,7 +274,7 @@ public class TagGenerator extends Activity {
                 Collections.shuffle(others);
                 Collections.shuffle(outdoor);
                 Collections.shuffle(people);
-                
+
                 if(temp.startsWith("food_")){
                     for(int i=0; i<3; i++) {
                         rb[i]  = new RadioButton(TagGenerator.this);
