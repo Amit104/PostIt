@@ -54,6 +54,7 @@ public class MainActivity extends AppCompatActivity {
     int counter;
     ProgressBar progressBar;
     ArrayList<Uri> imageUri = new ArrayList<Uri>();
+    ArrayList<Uri> imageUriRanked = new ArrayList<Uri>();
     ArrayList< Pair<String, Double> > scoreList = new ArrayList<>();
     ArrayList<Uri> imageUriSingle = new ArrayList<Uri>();
     ArrayList< Pair<String, Double> > scoreListSingle = new ArrayList<>();
@@ -63,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
     ArrayList< Pair<String, Double> > scoreListView = new ArrayList<>();
     private static final int PICK_FROM_GALLERY = 1;
     private final String apiEndpoint = "https://westcentralus.api.cognitive.microsoft.com/face/v1.0";
-    private final String subscriptionKey = "d7502ded756743e5bd3c20227b188a44";
+    private final String subscriptionKey = "34ab0e4557724ec8a90ef592bf76a3e5";
     private final FaceServiceClient faceServiceClient =
             new FaceServiceRestClient(apiEndpoint, subscriptionKey);
 
@@ -96,6 +97,7 @@ public class MainActivity extends AppCompatActivity {
                         imageUriSingle.clear();
                         imageUriGroup.clear();
                         imageUriView.clear();
+                        imageUriRanked.clear();
 
                         Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
                         String today = new SimpleDateFormat("yyyyMMdd").format(new Date());
@@ -112,6 +114,9 @@ public class MainActivity extends AppCompatActivity {
                         for (Uri i : imageUri)
                             Log.d("Photo", i.toString());
                         allPics.setAdapter(new ImageAdapter(MainActivity.this,imageUri));
+                        singlePics.setAdapter(new ImageAdapter(MainActivity.this, imageUriSingle));
+                        groupPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriGroup));
+                        viewPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriView));
                         Process.setEnabled(true);
 
                     }
@@ -139,7 +144,10 @@ public class MainActivity extends AppCompatActivity {
                 }
                 else
                 {
-
+                    imageUriRanked.clear();
+                    imageUriView.clear();
+                    imageUriGroup.clear();
+                    imageUriSingle.clear();
                     counter=0;
                     for(Uri i : imageUri)
                     {
@@ -176,6 +184,7 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
+
         Log.d("API","[START]");
         AsyncTask<InputStream, String, Face[]> detectTask =
                 new AsyncTask<InputStream, String, Face[]>() {
@@ -231,11 +240,13 @@ public class MainActivity extends AppCompatActivity {
 
                         double score = new FaceRanking().rank(result);
                         Log.d("Scores : ", String.valueOf(score));
-                        scoreList.add(new Pair<String, Double>(path,score));
+                        addPair(0,new Pair<String, Double>(path,score));
+                        imageUriRanked.add(Uri.parse(path));
 
                         // add conditions here
                         if(result==null || result.length==0) {
-                            scoreListView.add(new Pair<String, Double>(path,score));
+                            addPair(3,new Pair<String, Double>(path,score));
+                            imageUriView.add(Uri.parse(path));
                         } else {
                             int baseArea = Getarea(result[0].faceRectangle.width, result[0].faceRectangle.height);
                             int fc = 0;
@@ -249,24 +260,27 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             }
                             if(fc==1) {
-                                scoreListSingle.add(new Pair<String, Double>(path,score));
+                                addPair(1,new Pair<String, Double>(path,score));
+                                imageUriSingle.add(Uri.parse(path));
                             } else {
-                                scoreListGroup.add(new Pair<String, Double>(path,score));
+                                addPair(2,new Pair<String, Double>(path,score));
+                                imageUriGroup.add(Uri.parse(path));
                             }
                         }
 
                         counter++;
-                        if(counter==imageUri.size())
-                        {
+                        if(counter==imageUri.size()) {
                             Process.setEnabled(true);
                             ChoosePhoto.setEnabled(true);
-                            for(Pair<String, Double> res : scoreList)
-                            {
+                            for (Pair<String, Double> res : scoreList) {
                                 Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
                             }
+                            progressBar.setVisibility(View.GONE);
+                        }
+
 
                             // logic for ranking and captioning
-                            scoreList.sort(new Comparator<Pair<String, Double>>() {
+                         /*   scoreList.sort(new Comparator<Pair<String, Double>>() {
 
                                 @Override
                                 public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
@@ -349,20 +363,60 @@ public class MainActivity extends AppCompatActivity {
                             {
                                 Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
                                 imageUriView.add(Uri.parse(res.first));
-                            }
+                            }*/
 
-                            allPics.setAdapter(new ImageAdapter(MainActivity.this, imageUri));
+                            allPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriRanked));
                             singlePics.setAdapter(new ImageAdapter(MainActivity.this, imageUriSingle));
                             groupPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriGroup));
                             viewPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriView));
-                            progressBar.setVisibility(View.GONE);
-                        }
                     }
                 };
 
         detectTask.execute(inputStream);
     }
 
+    public void addPair(int group, Pair<String, Double> newitem)
+    {
+        if(group==0)
+        {
+            int position= BinaryFit(scoreList,newitem);
+            scoreList.add(position,newitem);
+        }
+        if(group==1)
+        {
+            int position= BinaryFit(scoreListSingle,newitem);
+            scoreListSingle.add(position,newitem);
+        }
+        if(group==2)
+        {
+            int position= BinaryFit(scoreListGroup,newitem);
+            scoreListGroup.add(position,newitem);
+        }
+        if(group==3)
+        {
+            int position= BinaryFit(scoreListView,newitem);
+            scoreListView.add(position,newitem);
+        }
+    }
+    public int BinaryFit(ArrayList< Pair<String, Double> > list, Pair<String,Double> newitem)
+    {
+        if(list.size()==0)
+            return 0;
+        int left=0,right=list.size()-1,mid=0;
+        while(left<right)
+        {
+            mid=left+(right-left)/2;
+            if(list.get(mid).second>=newitem.second)
+            {
+                right=mid-1;
+            }
+            else
+            {
+                left=mid+1;
+            }
+        }
+        return left;
+    }
     public int Getarea(int width, int height){
         return width*height;
     }

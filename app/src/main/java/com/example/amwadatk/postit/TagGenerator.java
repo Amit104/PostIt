@@ -140,7 +140,7 @@ public class TagGenerator extends Activity {
 
 
         if (client==null){
-            client = new VisionServiceRestClient("84b235ebbcbe455f9173f10630cc15aa", "https://westcentralus.api.cognitive.microsoft.com/vision/v1.0");
+            client = new VisionServiceRestClient("c9eeece173424d5fb5419051d98a5808", "https://westcentralus.api.cognitive.microsoft.com/vision/v1.0");
         }
         try {
             new doRequest().execute();
