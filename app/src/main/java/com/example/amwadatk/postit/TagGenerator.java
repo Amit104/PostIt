@@ -3,7 +3,9 @@ package com.example.amwadatk.postit;
 import android.app.ProgressDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.location.Address;
@@ -14,9 +16,12 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.app.Activity;
 import android.os.StrictMode;
+import android.preference.PreferenceManager;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Base64;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -24,9 +29,16 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.google.gson.Gson;
+import com.microsoft.projectoxford.face.FaceServiceClient;
+import com.microsoft.projectoxford.face.FaceServiceRestClient;
+import com.microsoft.projectoxford.face.contract.Face;
+import com.microsoft.projectoxford.face.contract.FaceAttribute;
+import com.microsoft.projectoxford.face.contract.FaceRectangle;
+import com.microsoft.projectoxford.face.rest.ClientException;
 import com.microsoft.projectoxford.vision.VisionServiceClient;
 import com.microsoft.projectoxford.vision.VisionServiceRestClient;
 import com.microsoft.projectoxford.vision.contract.AnalysisResult;
@@ -41,11 +53,18 @@ import org.apache.commons.io.output.ByteArrayOutputStream;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
 
 public class TagGenerator extends Activity {
@@ -56,11 +75,15 @@ public class TagGenerator extends Activity {
     LinearLayout linearLayout;
     private Bitmap mBitmap;
     private VisionServiceClient client;
-    String cityName = "";
+    String cityName = "",numfaces="-1",faceid;
     Button shareimage;
     RadioButton[] rb;
     RadioGroup rg;
     int currentquote;
+    private final String apiEndpoint = "https://westcentralus.api.cognitive.microsoft.com/face/v1.0";
+    private final String subscriptionKey = "34ab0e4557724ec8a90ef592bf76a3e5";
+    private final FaceServiceClient faceServiceClient =
+            new FaceServiceRestClient(apiEndpoint, subscriptionKey);
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -68,6 +91,10 @@ public class TagGenerator extends Activity {
         StrictMode.VmPolicy.Builder newbuilder = new StrictMode.VmPolicy.Builder();
         StrictMode.setVmPolicy(newbuilder.build());
         path = getIntent().getStringExtra("path");
+        if(getIntent().hasExtra("imagetype"))
+            numfaces= getIntent().getStringExtra("imagetype");
+        if(getIntent().hasExtra("faceid"))
+            faceid = getIntent().getStringExtra("faceid");
         Log.d("MSG",getIntent().getStringExtra("path"));
         tagImage = findViewById(R.id.tagImage);
         tags = findViewById(R.id.tags);
@@ -115,8 +142,18 @@ public class TagGenerator extends Activity {
         shareimage = findViewById(R.id.shareimage);
         View.OnClickListener shareimg = new View.OnClickListener() {
             @Override
-            public void onClick(View v)
-            {
+            public void onClick(View v) {
+                SharedPreferences sharedPreferences = getSharedPreferences("userFace", MODE_PRIVATE);
+                if (!sharedPreferences.contains("face"))  //If the face id is not present in application
+                {
+                    if (numfaces.equals("1")) { //If it is a single user image (ie it comes in single group)
+                        setDefaults("face", ConvertfacetoString(path), getApplicationContext());
+                        setDefaults("faceid", faceid, getApplicationContext());
+                        setDefaults("facedate", new SimpleDateFormat("yyyyMMdd").format(new Date()), getApplicationContext());
+                    } else if (numfaces.equals("-1")) { //If it is not ranked and directly called for tag generation
+                        detectFaces();
+                    }
+                }
                 final Intent intent = new Intent(     android.content.Intent.ACTION_SEND);
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 intent.putExtra(Intent.EXTRA_TEXT, tags.getText().toString());
@@ -149,7 +186,95 @@ public class TagGenerator extends Activity {
         }
     }
 
+    public void detectFaces()
+    {
+        Bitmap image = BitmapFactory.decodeFile(path);
+        java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
+        image.compress(Bitmap.CompressFormat.JPEG, 30, outputStream);
+        ByteArrayInputStream inputStream =
+                new ByteArrayInputStream(outputStream.toByteArray());
+        FileOutputStream out = null;
+        try {
+            out = new FileOutputStream("/storage/emulated/0/DCIM/output.jpg");
+            image.compress(Bitmap.CompressFormat.JPEG, 30, out); // bmp is your Bitmap instance
+            // PNG is a lossless format, the compression factor (100) is ignored
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (out != null) {
+                    out.close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
 
+        Log.d("API", "[START]");
+        AsyncTask<InputStream, String, Face[]> detectTask =
+                new AsyncTask<InputStream, String, Face[]>() {
+                    String exceptionMessage = "";
+
+                    @Override
+                    protected Face[] doInBackground(InputStream... params) {
+                        try {
+                            Log.d("Inside API","Hello API");
+                            Face[] result = faceServiceClient.detect(
+                                    params[0],
+                                    true,         // returnFaceId
+                                    false,        // returnFaceLandmarks
+                                    new FaceServiceClient.FaceAttributeType[]{
+                                            FaceServiceClient.FaceAttributeType.Age,
+                                            FaceServiceClient.FaceAttributeType.Gender,
+                                            FaceServiceClient.FaceAttributeType.Smile,
+                                            FaceServiceClient.FaceAttributeType.Emotion,
+                                            FaceServiceClient.FaceAttributeType.Exposure,
+                                            FaceServiceClient.FaceAttributeType.Blur,
+                                            FaceServiceClient.FaceAttributeType.Occlusion}
+
+                            );
+                            if (result == null) {
+                                publishProgress(
+                                        "Detection Finished. Nothing detected");
+                                return null;
+                            }
+                            publishProgress(String.format(
+                                    "Detection Finished. %d face(s) detected",
+                                    result.length));
+                            Log.d("API", "Worked!");
+                            return result;
+                        } catch (Exception e) {
+                            exceptionMessage = String.format(
+                                    "Detection failed: %s", e.getMessage());
+                            return null;
+                        }
+                    }
+
+                    @Override
+                    protected void onPreExecute() {
+                        //TODO: show progress dialog
+                    }
+
+                    @Override
+                    protected void onProgressUpdate(String... progress) {
+                        //TODO: update progress
+                    }
+
+                    @Override
+                    protected void onPostExecute(Face[] result) {
+                        //TODO: update face frames
+                        Log.d("Outside API","API exit");
+                        if (result.length == 1) {
+
+                            setDefaults("face", ConvertfacetoString(path), getApplicationContext());
+                            setDefaults("faceid", result[0].faceId.toString(), getApplicationContext());
+                            setDefaults("facedate", new SimpleDateFormat("yyyyMMdd").format(new Date()), getApplicationContext());
+                        }
+
+                    }
+                };
+        detectTask.execute(inputStream);
+    }
     private String process() throws VisionServiceException, IOException {
         Gson gson = new Gson();
         String[] features = {"Tags","Description","Categories"};
@@ -182,6 +307,21 @@ public class TagGenerator extends Activity {
         }
 
         return result;
+    }
+
+    String ConvertfacetoString(String urlpath)
+    {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        Bitmap bitmap = BitmapFactory.decodeFile(urlpath);
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+        byte[] imageBytes = baos.toByteArray();
+        return Base64.encodeToString(imageBytes, Base64.DEFAULT);
+    }
+    public static void setDefaults(String key, String value, Context context) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putString(key, value);
+        editor.commit();
     }
 
     private class doRequest extends AsyncTask<String, String, String> {

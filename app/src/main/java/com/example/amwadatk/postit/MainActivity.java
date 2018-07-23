@@ -2,56 +2,65 @@ package com.example.amwadatk.postit;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
-import com.microsoft.projectoxford.face.*;
-import com.microsoft.projectoxford.face.contract.*;
-
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.icu.text.StringSearch;
 import android.net.Uri;
+import android.nfc.Tag;
 import android.os.AsyncTask;
+import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.GridView;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
+import com.microsoft.projectoxford.face.FaceServiceClient;
+import com.microsoft.projectoxford.face.FaceServiceRestClient;
+import com.microsoft.projectoxford.face.contract.Face;
+import com.microsoft.projectoxford.face.contract.FaceAttribute;
+import com.microsoft.projectoxford.face.contract.FaceRectangle;
+import com.microsoft.projectoxford.face.rest.ClientException;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Array;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.concurrent.ExecutionException;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity {
 
     Button ChoosePhoto,Process;
     ExpandableHeightGridView singlePics,groupPics,viewPics,allPics;
     int counter;
+    String userfaceid="";
     ProgressBar progressBar;
     ArrayList<Uri> imageUri = new ArrayList<Uri>();
     ArrayList<Uri> imageUriRanked = new ArrayList<Uri>();
@@ -62,12 +71,13 @@ public class MainActivity extends AppCompatActivity {
     ArrayList< Pair<String, Double> > scoreListGroup = new ArrayList<>();
     ArrayList<Uri> imageUriView = new ArrayList<Uri>();
     ArrayList< Pair<String, Double> > scoreListView = new ArrayList<>();
+    HashMap<String,Pair<Double,List<String>>> faceidall = new HashMap<>();
     private static final int PICK_FROM_GALLERY = 1;
     private final String apiEndpoint = "https://westcentralus.api.cognitive.microsoft.com/face/v1.0";
     private final String subscriptionKey = "34ab0e4557724ec8a90ef592bf76a3e5";
     private final FaceServiceClient faceServiceClient =
             new FaceServiceRestClient(apiEndpoint, subscriptionKey);
-
+    SharedPreferences sharedpreferences ;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -85,6 +95,29 @@ public class MainActivity extends AppCompatActivity {
         groupPics.setExpanded(true);
         viewPics.setExpanded(true);
         allPics.setExpanded(true);
+
+        sharedpreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        if(sharedpreferences.contains("face"))
+        {
+            Toast.makeText(getApplicationContext(),getDefaults("faceid",getApplicationContext()),Toast.LENGTH_LONG).show();
+            String lastupdated= sharedpreferences.getString("facedate","");
+            SimpleDateFormat formatter = new SimpleDateFormat("dd-MMM-yyyy HH:mm:ss");
+            try {
+                Date updated=formatter.parse(lastupdated);
+                Date currenttime = new Date();
+                long diff = currenttime.getTime() - updated.getTime();
+                long diffhours = diff  /(60*60 1000) ;
+                if(diffhours>23)
+                {
+                    Log.d("API from home","API home");
+                    new TagGenerator().detectFaces();
+                }
+                else
+                    userfaceid = sharedpreferences.getString("faceid","");
+            } catch (ParseException e) {
+                e.printStackTrace();
+            }
+        }
 
         ChoosePhoto.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -159,7 +192,10 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-
+    public static String getDefaults(String key, Context context) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        return preferences.getString(key, null);
+    }
 
     // Detect faces by uploading a face image.
     // Frame faces after detection.
@@ -239,6 +275,16 @@ public class MainActivity extends AppCompatActivity {
                         //TODO: update face frames
 
                         double score = new FaceRanking().rank(result);
+                        Pair<Double,List<String>> facescore;
+                        List<String> facelist = new ArrayList<String>();
+                        Log.d("FaceResult",result.length+"");
+                        if(result!= null) {
+                            for (Face face : result) {
+                                facelist.add(face.faceId.toString());
+                            }
+                            facescore = new Pair<>(score, facelist);
+                            faceidall.put(path, facescore);
+                        }
                         Log.d("Scores : ", String.valueOf(score));
                         addPair(0,new Pair<String, Double>(path,score));
                         imageUriRanked.add(Uri.parse(path));
@@ -275,7 +321,103 @@ public class MainActivity extends AppCompatActivity {
                             for (Pair<String, Double> res : scoreList) {
                                 Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
                             }
+                            if(!userfaceid.equals("") ) { //If the face is already set check for all photos to improve score
+                                scoreList.clear();
+                                scoreListSingle.clear();
+                                scoreListGroup.clear();
+                                for (Map.Entry<String, Pair<Double,List<String>>> entry : faceidall.entrySet()) {
+                                    String urlpath = entry.getKey();
+                                    facescore = entry.getValue();
+                                    facelist = facescore.second;
+                                    Double newscore = facescore.first;
+                                    for (String faceid : facelist) {
+                                        boolean samePerson = false;
+                                        try {
+                                            samePerson = faceServiceClient.verify(UUID.fromString(faceid), UUID.fromString(userfaceid)).isIdentical;
+                                        } catch (ClientException e) {
+                                            e.printStackTrace();
+                                        } catch (IOException e) {
+                                            e.printStackTrace();
+                                        }
+
+                                        if (samePerson)
+                                        {
+                                            newscore += 2.0 / facelist.size();
+                                        }
+                                    }
+                                    scoreList.add(new Pair<String, Double>(urlpath,newscore));
+                                    if(facelist.size()==1)
+                                        scoreListSingle.add(new Pair<String, Double>(urlpath,newscore));
+                                    if(facelist.size()>1)
+                                        scoreListGroup.add(new Pair<String, Double>(path,newscore));
+                                }
+                                //Sorting Logic
+                                scoreList.sort(new Comparator<Pair<String, Double>>() {
+
+                                    @Override
+                                    public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
+                                        if (o1.second > o2.second) {
+                                            return -1;
+                                        } else if (o1.second.equals(o2.second)) {
+                                            return 0; // You can change this to make it then look at the
+                                            //words alphabetical order
+                                        } else {
+                                            return 1;
+                                        }
+                                    }
+                                });
+                                scoreListSingle.sort(new Comparator<Pair<String, Double>>() {
+
+                                    @Override
+                                    public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
+                                        if (o1.second > o2.second) {
+                                            return -1;
+                                        } else if (o1.second.equals(o2.second)) {
+                                            return 0; // You can change this to make it then look at the
+                                            //words alphabetical order
+                                        } else {
+                                            return 1;
+                                        }
+                                    }
+                                });
+                                scoreListGroup.sort(new Comparator<Pair<String, Double>>() {
+
+                                    @Override
+                                    public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
+                                        if (o1.second > o2.second) {
+                                            return -1;
+                                        } else if (o1.second.equals(o2.second)) {
+                                            return 0; // You can change this to make it then look at the
+                                            //words alphabetical order
+                                        } else {
+                                            return 1;
+                                        }
+                                    }
+                                });
+
+                                imageUriRanked.clear();
+                                imageUriSingle.clear();
+                                imageUriGroup.clear();
+                                for(Pair<String, Double> res : scoreList)
+                                {
+                                    Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
+                                    imageUriRanked.add(Uri.parse(res.first));
+                                }
+
+                                for(Pair<String, Double> res : scoreListSingle)
+                                {
+                                    Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
+                                    imageUriSingle.add(Uri.parse(res.first));
+                                }
+
+                                for(Pair<String, Double> res : scoreListGroup)
+                                {
+                                    Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
+                                    imageUriGroup.add(Uri.parse(res.first));
+                                }
+                            }
                             progressBar.setVisibility(View.GONE);
+
                         }
 
 
@@ -431,7 +573,7 @@ public class MainActivity extends AppCompatActivity {
                 .create().show();
     }
 
-    private class ImageAdapter extends BaseAdapter {
+    class ImageAdapter extends BaseAdapter {
 
         private Activity context;
         private ArrayList<Uri> imageUrit;
@@ -472,7 +614,15 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onClick(View view) {
                     Intent i = new Intent(MainActivity.this,TagGenerator.class);
-                    i.putExtra("path",imageUrit.get(position).toString());
+                    String urlpath = imageUrit.get(position).toString();
+                    i.putExtra("path",urlpath);
+                    if(faceidall!= null && faceidall.size()!=0) { //if faces are ranked
+                        i.putExtra("imagetype", faceidall.get(urlpath).second.size() + "");
+                        if (faceidall.get(urlpath).second.size() == 1)
+                            i.putExtra("faceid", faceidall.get(urlpath).second.get(0));
+                        else
+                            i.putExtra("faceid", "0");
+                    }
                     startActivity(i);
                 }
             });
