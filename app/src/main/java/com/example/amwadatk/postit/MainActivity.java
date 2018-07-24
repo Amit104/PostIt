@@ -3,17 +3,22 @@ package com.example.amwadatk.postit;
 import android.Manifest;
 import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import com.microsoft.projectoxford.face.*;
 import com.microsoft.projectoxford.face.contract.*;
 
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.preference.PreferenceManager;
 import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
@@ -34,6 +39,7 @@ import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
+import com.microsoft.projectoxford.face.rest.ClientException;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -45,6 +51,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
@@ -67,9 +75,14 @@ public class MainActivity extends AppCompatActivity {
     private final String subscriptionKey = "34ab0e4557724ec8a90ef592bf76a3e5";
     private final FaceServiceClient faceServiceClient =
             new FaceServiceRestClient(apiEndpoint, subscriptionKey);
+    DatabaseHandler db;
+    SharedPreferences sharedpreferences;
+    HashMap<String,Face[]> faceidall = new HashMap<>();
+
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState)
+    {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ChoosePhoto = findViewById(R.id.chooseButton);
@@ -85,6 +98,16 @@ public class MainActivity extends AppCompatActivity {
         groupPics.setExpanded(true);
         viewPics.setExpanded(true);
         allPics.setExpanded(true);
+
+        db = new DatabaseHandler(this);
+        sharedpreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        if(!sharedpreferences.contains("personGroupId"))
+        {
+            String uniqueID = UUID.randomUUID().toString();
+            Log.d("unique Id",uniqueID);
+            CreateGroup(uniqueID);
+        }
+
 
         ChoosePhoto.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -161,8 +184,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    // Detect faces by uploading a face image.
-    // Frame faces after detection.
     private void detectAndFrame(final Bitmap imageBitmap, final String path) {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         imageBitmap.compress(Bitmap.CompressFormat.JPEG, 30, outputStream);
@@ -248,6 +269,7 @@ public class MainActivity extends AppCompatActivity {
                             addPair(3,new Pair<String, Double>(path,score));
                             imageUriView.add(Uri.parse(path));
                         } else {
+                            faceidall.put(path, result);
                             int baseArea = Getarea(result[0].faceRectangle.width, result[0].faceRectangle.height);
                             int fc = 0;
                             for (Face face : result) {
@@ -277,93 +299,6 @@ public class MainActivity extends AppCompatActivity {
                             }
                             progressBar.setVisibility(View.GONE);
                         }
-
-
-                            // logic for ranking and captioning
-                         /*   scoreList.sort(new Comparator<Pair<String, Double>>() {
-
-                                @Override
-                                public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
-                                    if (o1.second > o2.second) {
-                                        return -1;
-                                    } else if (o1.second.equals(o2.second)) {
-                                        return 0; // You can change this to make it then look at the
-                                        //words alphabetical order
-                                    } else {
-                                        return 1;
-                                    }
-                                }
-                            });
-                            scoreListSingle.sort(new Comparator<Pair<String, Double>>() {
-
-                                @Override
-                                public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
-                                    if (o1.second > o2.second) {
-                                        return -1;
-                                    } else if (o1.second.equals(o2.second)) {
-                                        return 0; // You can change this to make it then look at the
-                                        //words alphabetical order
-                                    } else {
-                                        return 1;
-                                    }
-                                }
-                            });
-                            scoreListGroup.sort(new Comparator<Pair<String, Double>>() {
-
-                                @Override
-                                public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
-                                    if (o1.second > o2.second) {
-                                        return -1;
-                                    } else if (o1.second.equals(o2.second)) {
-                                        return 0; // You can change this to make it then look at the
-                                        //words alphabetical order
-                                    } else {
-                                        return 1;
-                                    }
-                                }
-                            });
-                            scoreListView.sort(new Comparator<Pair<String, Double>>() {
-
-                                @Override
-                                public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
-                                    if (o1.second > o2.second) {
-                                        return -1;
-                                    } else if (o1.second.equals(o2.second)) {
-                                        return 0; // You can change this to make it then look at the
-                                        //words alphabetical order
-                                    } else {
-                                        return 1;
-                                    }
-                                }
-                            });
-                            imageUri.clear();
-                            imageUriSingle.clear();
-                            imageUriGroup.clear();
-                            imageUriView.clear();
-
-                            for(Pair<String, Double> res : scoreList)
-                            {
-                                Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
-                                imageUri.add(Uri.parse(res.first));
-                            }
-
-                            for(Pair<String, Double> res : scoreListSingle)
-                            {
-                                Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
-                                imageUriSingle.add(Uri.parse(res.first));
-                            }
-
-                            for(Pair<String, Double> res : scoreListGroup)
-                            {
-                                Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
-                                imageUriGroup.add(Uri.parse(res.first));
-                            }
-
-                            for(Pair<String, Double> res : scoreListView)
-                            {
-                                Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
-                                imageUriView.add(Uri.parse(res.first));
-                            }*/
 
                             allPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriRanked));
                             singlePics.setAdapter(new ImageAdapter(MainActivity.this, imageUriSingle));
@@ -398,6 +333,7 @@ public class MainActivity extends AppCompatActivity {
             scoreListView.add(position,newitem);
         }
     }
+
     public int BinaryFit(ArrayList< Pair<String, Double> > list, Pair<String,Double> newitem)
     {
         if(list.size()==0)
@@ -429,6 +365,108 @@ public class MainActivity extends AppCompatActivity {
                     public void onClick(DialogInterface dialog, int id) {
                     }})
                 .create().show();
+    }
+
+    public static String getDefaults(String key, Context context) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        return preferences.getString(key, null);
+    }
+
+    public static void setDefaults(String key, String value, Context context) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putString(key, value);
+        editor.commit();
+    }
+
+    private void CreateGroup(final String uniqueId) {
+
+        AsyncTask<String, Void, String> createPersonGroup =
+                new AsyncTask<String, Void, String>() {
+
+                    @Override
+                    protected String doInBackground(String... params) {
+                        try {
+                            faceServiceClient.createPersonGroup(params[0], "Persons", "Faces");
+                        } catch (ClientException e) {
+
+                        } catch (IOException e) {
+
+                        }
+                        return params[0];
+                    }
+
+
+                    @Override
+                    protected void onPostExecute(String uid) {
+                        progressBar.setVisibility(View.GONE);
+                        getGroup(uid);
+                    }
+
+
+                    @Override
+                    protected void onPreExecute() {
+                        progressBar.setVisibility(View.VISIBLE);
+                    }
+
+
+                    @Override
+                    protected void onProgressUpdate(Void... text) {
+
+                    }
+                };
+        try {
+            createPersonGroup.execute(uniqueId).get();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void getGroup(final String uniqueId) {
+
+        AsyncTask<String, Void, PersonGroup> getPersonGroup =
+                new AsyncTask<String, Void, PersonGroup>() {
+
+                    @Override
+                    protected PersonGroup doInBackground(String... params) {
+                        PersonGroup p = null;
+                        try {
+                            p = faceServiceClient.getPersonGroup(params[0]);
+                        } catch (ClientException e) {
+
+                        } catch (IOException e) {
+
+                        }
+                        return p;
+                    }
+
+
+                    @Override
+                    protected void onPostExecute(PersonGroup p) {
+                        progressBar.setVisibility(View.GONE);
+                        if(p!=null && p.personGroupId.equals(uniqueId))
+                        {
+                            setDefaults("personGroupId",uniqueId,getApplicationContext());
+                            Log.d("SUCCESS","Added "+ p.personGroupId);
+                        }
+                        else
+                            Log.d("Error", "PesonGroupID not found");
+                    }
+
+
+                    @Override
+                    protected void onPreExecute() {
+                        progressBar.setVisibility(View.VISIBLE);
+                    }
+
+                    @Override
+                    protected void onProgressUpdate(Void... text) {
+
+                    }
+                };
+        getPersonGroup.execute(uniqueId);
     }
 
     private class ImageAdapter extends BaseAdapter {
@@ -473,6 +511,14 @@ public class MainActivity extends AppCompatActivity {
                 public void onClick(View view) {
                     Intent i = new Intent(MainActivity.this,TagGenerator.class);
                     i.putExtra("path",imageUrit.get(position).toString());
+                    if(faceidall.containsKey(imageUrit.get(position).toString()))
+                    {
+                        TagGenerator.faces = faceidall.get(imageUrit.get(position).toString());
+                    }
+                    else
+                    {
+                        TagGenerator.faces = null;
+                    }
                     startActivity(i);
                 }
             });

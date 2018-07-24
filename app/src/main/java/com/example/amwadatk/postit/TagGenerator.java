@@ -3,7 +3,9 @@ package com.example.amwadatk.postit;
 import android.app.ProgressDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.location.Address;
@@ -13,12 +15,11 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.app.Activity;
-import android.os.Environment;
 import android.os.StrictMode;
+import android.preference.PreferenceManager;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
-import android.util.Pair;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -33,23 +34,28 @@ import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.google.gson.Gson;
+import com.microsoft.projectoxford.face.FaceServiceClient;
+import com.microsoft.projectoxford.face.FaceServiceRestClient;
+import com.microsoft.projectoxford.face.contract.Candidate;
+import com.microsoft.projectoxford.face.contract.Face;
+import com.microsoft.projectoxford.face.contract.IdentifyResult;
+import com.microsoft.projectoxford.face.contract.PersonGroup;
+import com.microsoft.projectoxford.face.rest.ClientException;
 import com.microsoft.projectoxford.vision.VisionServiceClient;
 import com.microsoft.projectoxford.vision.VisionServiceRestClient;
 import com.microsoft.projectoxford.vision.contract.AnalysisResult;
-import com.microsoft.projectoxford.vision.contract.Caption;
 import com.microsoft.projectoxford.vision.contract.Category;
-import com.microsoft.projectoxford.vision.contract.Description;
 import com.microsoft.projectoxford.vision.contract.Tag;
 import com.microsoft.projectoxford.vision.rest.VisionServiceException;
 
-import org.apache.commons.io.TaggedIOException;
 import org.apache.commons.io.output.ByteArrayOutputStream;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileReader;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,6 +63,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 
 public class TagGenerator extends Activity implements AdapterView.OnItemSelectedListener {
@@ -75,6 +83,14 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
     Spinner dropdown;
     HashMap<String,List<String>> quotesList = new HashMap<>();
     List<String> quoteCat;
+    DatabaseHandler db;
+    SharedPreferences sharedpreferences;
+    public static Face[] faces;
+    private final String apiEndpoint = "https://westcentralus.api.cognitive.microsoft.com/face/v1.0";
+    private final String subscriptionKey = "34ab0e4557724ec8a90ef592bf76a3e5";
+    private final FaceServiceClient faceServiceClient =
+            new FaceServiceRestClient(apiEndpoint, subscriptionKey);
+    IdentifyResult[] resultsPersons;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,6 +105,9 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
         tags = findViewById(R.id.tags);
         currentquote =0;
         tagstext="";
+
+        db = new DatabaseHandler(this);
+        sharedpreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
 
         try{
             InputStreamReader is = new InputStreamReader(getAssets()
@@ -168,7 +187,38 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
             @Override
             public void onClick(View v)
             {
-                final Intent intent = new Intent(     android.content.Intent.ACTION_SEND);
+                if(null == faces) {
+                    detectFaces();
+                }
+                if(null != faces)
+                {
+                    UUID[] faceIds = new  UUID[faces.length];
+                    for(int i = 0; i < faces.length ; ++i)
+                    {
+                        faceIds[i] = faces[i].faceId;
+                    }
+                    IdentifyResult[] resultsPersonstemp = getKnownPersons(faceIds);
+                    if(null!=resultsPersonstemp)
+                    {
+                        resultsPersons = resultsPersonstemp;
+                    }
+                    if(null!=resultsPersons)
+                    {
+                        for(int i=0; i<resultsPersons.length; ++i)
+                        {
+                            if(resultsPersons[i].candidates.size() == 0)
+                            {
+                                Log.d("GROUP","NO ONE FOUND");
+                            }
+                            else
+                            {
+                                Log.d("GROUP","FOUND");
+                            }
+                        }
+                    }
+                }
+
+                final Intent intent = new Intent(android.content.Intent.ACTION_SEND);
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 intent.putExtra(Intent.EXTRA_TEXT, tags.getText().toString());
                 intent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(new File(path)));
@@ -222,6 +272,51 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
         }
     }
 
+
+    private IdentifyResult[] getKnownPersons(final UUID[] fIds) {
+
+        AsyncTask<UUID[], Void, IdentifyResult[]> getKnown =
+                new AsyncTask<UUID[], Void, IdentifyResult[]>() {
+
+                    @Override
+                    protected IdentifyResult[] doInBackground(UUID[]... params) {
+                        IdentifyResult[] p = null;
+                        try {
+                            p = faceServiceClient.identityInPersonGroup(getDefaults("personGroupId",getApplicationContext()),params[0],20);
+;
+                        } catch (ClientException e) {
+
+                        } catch (IOException e) {
+
+                        }
+                        return p;
+                    }
+
+
+                    @Override
+                    protected void onPostExecute(IdentifyResult[] results) {
+                        resultsPersons = results;
+                    }
+
+                    @Override
+                    protected void onPreExecute() {
+
+                    }
+
+                    @Override
+                    protected void onProgressUpdate(Void... text) {
+
+                    }
+                };
+        try {
+            return getKnown.execute(fIds).get();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     private String process() throws VisionServiceException, IOException {
         Gson gson = new Gson();
@@ -280,6 +375,18 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
     @Override
     public void onNothingSelected(AdapterView<?> adapterView) {
 
+    }
+
+    public static String getDefaults(String key, Context context) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        return preferences.getString(key, null);
+    }
+
+    public static void setDefaults(String key, String value, Context context) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putString(key, value);
+        editor.commit();
     }
 
     private class doRequest extends AsyncTask<String, String, String> {
@@ -373,38 +480,6 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                 Collections.shuffle(outdoor);
                 Collections.shuffle(people);
 
-               /* if(temp.startsWith("food_")){
-                    for(int i=0; i<3; i++) {
-                        rb[i]  = new RadioButton(TagGenerator.this);
-                        rb[i].setText(food.get(i));
-                        rb[i].setId(i);
-                        rg.addView(rb[i]);
-                    }
-                }
-                else if(temp.startsWith("people_")){
-                    for(int i=0; i<3; i++) {
-                        rb[i]  = new RadioButton(TagGenerator.this);
-                        rb[i].setText(people.get(i));
-                        rb[i].setId(i);
-                        rg.addView(rb[i]);
-                    }
-                }
-                else if(temp.startsWith("outdoor_") || temp.startsWith("plant") || temp.startsWith("sky")){
-                    for(int i=0; i<3; i++) {
-                        rb[i]  = new RadioButton(TagGenerator.this);
-                        rb[i].setText(outdoor.get(i));
-                        rb[i].setId(i);
-                        rg.addView(rb[i]);
-                    }
-                }
-                else{
-                    for(int i=0; i<3; i++) {
-                        rb[i]  = new RadioButton(TagGenerator.this);
-                        rb[i].setText(others.get(i));
-                        rb[i].setId(i);
-                        rg.addView(rb[i]);
-                    }
-                }*/
                 tagstext =tags.getText().toString();
             }
             if (dialog.isShowing()) {
@@ -414,4 +489,94 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
         }
     }
 
+    public void detectFaces()
+    {
+        Bitmap image = BitmapFactory.decodeFile(path);
+        java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
+        image.compress(Bitmap.CompressFormat.JPEG, 30, outputStream);
+        ByteArrayInputStream inputStream =
+                new ByteArrayInputStream(outputStream.toByteArray());
+        FileOutputStream out = null;
+        try {
+            out = new FileOutputStream("/storage/emulated/0/DCIM/output.jpg");
+            image.compress(Bitmap.CompressFormat.JPEG, 30, out); // bmp is your Bitmap instance
+            // PNG is a lossless format, the compression factor (100) is ignored
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (out != null) {
+                    out.close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        Log.d("API", "[START]");
+        AsyncTask<InputStream, String, Face[]> detectTask =
+                new AsyncTask<InputStream, String, Face[]>() {
+                    String exceptionMessage = "";
+
+                    @Override
+                    protected Face[] doInBackground(InputStream... params) {
+                        try {
+                            Log.d("Inside API","Hello API");
+                            Face[] result = faceServiceClient.detect(
+                                    params[0],
+                                    true,         // returnFaceId
+                                    false,        // returnFaceLandmarks
+                                    new FaceServiceClient.FaceAttributeType[]{
+                                            FaceServiceClient.FaceAttributeType.Age,
+                                            FaceServiceClient.FaceAttributeType.Gender,
+                                            FaceServiceClient.FaceAttributeType.Smile,
+                                            FaceServiceClient.FaceAttributeType.Emotion,
+                                            FaceServiceClient.FaceAttributeType.Exposure,
+                                            FaceServiceClient.FaceAttributeType.Blur,
+                                            FaceServiceClient.FaceAttributeType.Occlusion}
+
+                            );
+                            if (result == null) {
+                                publishProgress(
+                                        "Detection Finished. Nothing detected");
+                                return null;
+                            }
+                            publishProgress(String.format(
+                                    "Detection Finished. %d face(s) detected",
+                                    result.length));
+                            Log.d("API", "Worked!");
+                            return result;
+                        } catch (Exception e) {
+                            exceptionMessage = String.format(
+                                    "Detection failed: %s", e.getMessage());
+                            return null;
+                        }
+                    }
+
+                    @Override
+                    protected void onPreExecute() {
+                        //TODO: show progress dialog
+                    }
+
+                    @Override
+                    protected void onProgressUpdate(String... progress) {
+                        //TODO: update progress
+                    }
+
+                    @Override
+                    protected void onPostExecute(Face[] result) {
+                        //TODO: update face frames
+                        Log.d("Outside API","API exit");
+                        faces = result;
+
+                    }
+                };
+        try {
+            detectTask.execute(inputStream).get();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        }
+    }
 }
