@@ -113,7 +113,11 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
         StrictMode.setVmPolicy(newbuilder.build());
         path = getIntent().getStringExtra("path");
         if(getIntent().hasExtra("imagetype"))
+        {
             numfaces= getIntent().getStringExtra("imagetype");
+            Log.d("NUM",numfaces);
+        }
+
         if(getIntent().hasExtra("faceid"))
             faceid = getIntent().getStringExtra("faceid");
         Log.d("MSG",getIntent().getStringExtra("path"));
@@ -205,7 +209,7 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                     if (numfaces.equals("1")) { //If it is a single user image (ie it comes in single group)
                         setDefaults("face", ConvertfacetoString(path), getApplicationContext());
                         setDefaults("faceid", faceid, getApplicationContext());
-                        setDefaults("facedate", new SimpleDateFormat("yyyyMMdd").format(new Date()), getApplicationContext());
+                        setDefaults("facedate", new SimpleDateFormat("yyyyMMdd hhmmss").format(new Date()), getApplicationContext());
                     } else if (numfaces.equals("-1")) { //If it is not ranked and directly called for tag generation
                         detectFaces();
                     }

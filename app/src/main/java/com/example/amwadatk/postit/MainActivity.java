@@ -54,6 +54,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -99,9 +100,9 @@ public class MainActivity extends AppCompatActivity {
         sharedpreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
         if(sharedpreferences.contains("face"))
         {
-            Toast.makeText(getApplicationContext(),getDefaults("faceid",getApplicationContext()),Toast.LENGTH_LONG).show();
+            //Toast.makeText(getApplicationContext(),getDefaults("faceid",getApplicationContext()),Toast.LENGTH_LONG).show();
             String lastupdated= sharedpreferences.getString("facedate","");
-            SimpleDateFormat formatter = new SimpleDateFormat("dd-MMM-yyyy HH:mm:ss");
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd hhmmss");
             try {
                 Date updated=formatter.parse(lastupdated);
                 Date currenttime = new Date();
@@ -113,9 +114,14 @@ public class MainActivity extends AppCompatActivity {
                     new TagGenerator().detectFaces();
                 }
                 else
-                    userfaceid = sharedpreferences.getString("faceid","");
+                {
+                    userfaceid = getDefaults("faceid",getApplicationContext());
+                    Log.d("FACEID",userfaceid);
+                }
+
             } catch (ParseException e) {
                 e.printStackTrace();
+
             }
         }
 
@@ -279,8 +285,16 @@ public class MainActivity extends AppCompatActivity {
                         List<String> facelist = new ArrayList<String>();
                         Log.d("FaceResult",result.length+"");
                         if(result!= null) {
+                            int baseArea = Getarea(result[0].faceRectangle.width, result[0].faceRectangle.height);
+                            int fc = 0;
                             for (Face face : result) {
-                                facelist.add(face.faceId.toString());
+                                FaceRectangle faceRectangle = face.faceRectangle;
+                                FaceAttribute faceAttribute = face.faceAttributes;
+                                int size = Getarea(faceRectangle.width, faceRectangle.height);
+                                if (size > 0.1 * baseArea) {
+                                    fc++;
+                                    facelist.add(face.faceId.toString());
+                                }
                             }
                             facescore = new Pair<>(score, facelist);
                             faceidall.put(path, facescore);
@@ -331,18 +345,59 @@ public class MainActivity extends AppCompatActivity {
                                     facelist = facescore.second;
                                     Double newscore = facescore.first;
                                     for (String faceid : facelist) {
+
+                                        AsyncTask<String, String, String> verifyTask =
+                                                new AsyncTask<String, String, String>() {
+                                                    String exceptionMessage = "";
+
+                                                    @Override
+                                                    protected String doInBackground(String... params) {
+                                                        boolean samePerson = false;
+                                                        try {
+                                                            samePerson = faceServiceClient.verify(UUID.fromString(params[0]), UUID.fromString(params[1])).isIdentical;
+                                                        } catch (ClientException e) {
+                                                            e.printStackTrace();
+                                                        } catch (IOException e) {
+                                                            e.printStackTrace();
+                                                        }
+                                                        Log.d("API VERIFY", "Worked!");
+                                                        if(samePerson)
+                                                            return "true";
+                                                        else
+                                                            return "false";
+                                                    }
+
+                                                    @Override
+                                                    protected void onPreExecute() {
+                                                        //TODO: show progress dialog
+                                                        progressBar.setVisibility(View.VISIBLE);
+                                                    }
+
+                                                    @Override
+                                                    protected void onProgressUpdate(String... progress) {
+                                                        //TODO: update progress
+                                                    }
+
+                                                    @Override
+                                                    protected void onPostExecute(String result) {
+                                                        //TODO: update face frames
+
+                                                    }
+                                                };
                                         boolean samePerson = false;
                                         try {
-                                            samePerson = faceServiceClient.verify(UUID.fromString(faceid), UUID.fromString(userfaceid)).isIdentical;
-                                        } catch (ClientException e) {
+                                            samePerson = verifyTask.execute(faceid, userfaceid).get().equals("true")?true:false;
+                                        } catch (InterruptedException e) {
                                             e.printStackTrace();
-                                        } catch (IOException e) {
+                                        } catch (ExecutionException e) {
                                             e.printStackTrace();
                                         }
 
+                                        Log.d("SAME", String.valueOf(samePerson));
                                         if (samePerson)
                                         {
                                             newscore += 2.0 / facelist.size();
+                                            Log.d("NEW", String.valueOf(newscore));
                                         }
                                     }
                                     scoreList.add(new Pair<String, Double>(urlpath,newscore));
