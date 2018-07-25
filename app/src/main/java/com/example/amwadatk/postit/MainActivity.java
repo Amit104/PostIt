@@ -64,6 +64,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -289,11 +290,9 @@ public class MainActivity extends AppCompatActivity {
         Process.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
                 progressBar.setVisibility(View.VISIBLE);
                 Process.setEnabled(false);
                 ChoosePhoto.setEnabled(false);
-
                 if(imageUri.size()==0)
                 {
                     progressBar.setVisibility(View.GONE);
@@ -357,8 +356,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     protected Face[] doInBackground(InputStream... params) {
                         try {
-                            publishProgress("Detecting...");
-                            Face[] result = faceServiceClient.detect(
+                                    Face[] result = faceServiceClient.detect(
                                     params[0],
                                     true,         // returnFaceId
                                     false,        // returnFaceLandmarks
@@ -392,7 +390,6 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     protected void onPreExecute() {
                         //TODO: show progress dialog
-
                     }
                     @Override
                     protected void onProgressUpdate(String... progress) {
@@ -449,7 +446,6 @@ public class MainActivity extends AppCompatActivity {
                                 imageUriGroup.add(Uri.parse(path));
                             }
                         }
-
                         counter++;
                         if(counter==imageUri.size()) {
                             Process.setEnabled(true);
@@ -492,7 +488,6 @@ public class MainActivity extends AppCompatActivity {
                                                     @Override
                                                     protected void onPreExecute() {
                                                         //TODO: show progress dialog
-                                                        progressBar.setVisibility(View.VISIBLE);
                                                     }
 
                                                     @Override
@@ -594,104 +589,15 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             }
                             progressBar.setVisibility(View.GONE);
-
                         }
-
-
-                            // logic for ranking and captioning
-                         /*   scoreList.sort(new Comparator<Pair<String, Double>>() {
-
-                                @Override
-                                public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
-                                    if (o1.second > o2.second) {
-                                        return -1;
-                                    } else if (o1.second.equals(o2.second)) {
-                                        return 0; // You can change this to make it then look at the
-                                        //words alphabetical order
-                                    } else {
-                                        return 1;
-                                    }
-                                }
-                            });
-                            scoreListSingle.sort(new Comparator<Pair<String, Double>>() {
-
-                                @Override
-                                public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
-                                    if (o1.second > o2.second) {
-                                        return -1;
-                                    } else if (o1.second.equals(o2.second)) {
-                                        return 0; // You can change this to make it then look at the
-                                        //words alphabetical order
-                                    } else {
-                                        return 1;
-                                    }
-                                }
-                            });
-                            scoreListGroup.sort(new Comparator<Pair<String, Double>>() {
-
-                                @Override
-                                public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
-                                    if (o1.second > o2.second) {
-                                        return -1;
-                                    } else if (o1.second.equals(o2.second)) {
-                                        return 0; // You can change this to make it then look at the
-                                        //words alphabetical order
-                                    } else {
-                                        return 1;
-                                    }
-                                }
-                            });
-                            scoreListView.sort(new Comparator<Pair<String, Double>>() {
-
-                                @Override
-                                public int compare(Pair<String, Double> o1, Pair<String, Double> o2) {
-                                    if (o1.second > o2.second) {
-                                        return -1;
-                                    } else if (o1.second.equals(o2.second)) {
-                                        return 0; // You can change this to make it then look at the
-                                        //words alphabetical order
-                                    } else {
-                                        return 1;
-                                    }
-                                }
-                            });
-                            imageUri.clear();
-                            imageUriSingle.clear();
-                            imageUriGroup.clear();
-                            imageUriView.clear();
-
-                            for(Pair<String, Double> res : scoreList)
-                            {
-                                Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
-                                imageUri.add(Uri.parse(res.first));
-                            }
-
-                            for(Pair<String, Double> res : scoreListSingle)
-                            {
-                                Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
-                                imageUriSingle.add(Uri.parse(res.first));
-                            }
-
-                            for(Pair<String, Double> res : scoreListGroup)
-                            {
-                                Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
-                                imageUriGroup.add(Uri.parse(res.first));
-                            }
-
-                            for(Pair<String, Double> res : scoreListView)
-                            {
-                                Log.d("SCORE", String.valueOf(res.second) + " for " + res.first);
-                                imageUriView.add(Uri.parse(res.first));
-                            }*/
-
-                            allPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriRanked));
-                            singlePics.setAdapter(new ImageAdapter(MainActivity.this, imageUriSingle));
-                            groupPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriGroup));
-                            viewPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriView));
+                        allPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriRanked));
+                        singlePics.setAdapter(new ImageAdapter(MainActivity.this, imageUriSingle));
+                        groupPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriGroup));
+                        viewPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriView));
                     }
                 };
-        progressBar.setVisibility(View.VISIBLE);
-        detectTask.execute(inputStream);
+        Executor exec = AsyncTask.THREAD_POOL_EXECUTOR;
+        detectTask.executeOnExecutor(exec,inputStream);
     }
 
     public void addPair(int group, Pair<String, Double> newitem)
