@@ -2,6 +2,8 @@ package com.example.amwadatk.postit;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.DatePickerDialog;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -10,6 +12,8 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.icu.text.StringSearch;
 import android.net.Uri;
 import android.nfc.Tag;
@@ -24,8 +28,10 @@ import android.util.Log;
 import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.BaseAdapter;
 import android.widget.Button;
+import android.widget.DatePicker;
 import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -41,17 +47,20 @@ import com.microsoft.projectoxford.face.rest.ClientException;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -62,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
     ExpandableHeightGridView singlePics,groupPics,viewPics,allPics;
     int counter;
     String userfaceid="";
+    Date fromDate = null, toDate = null;
     ProgressBar progressBar;
     ArrayList<Uri> imageUri = new ArrayList<Uri>();
     ArrayList<Uri> imageUriRanked = new ArrayList<Uri>();
@@ -79,6 +89,136 @@ public class MainActivity extends AppCompatActivity {
     private final FaceServiceClient faceServiceClient =
             new FaceServiceRestClient(apiEndpoint, subscriptionKey);
     SharedPreferences sharedpreferences ;
+    Calendar myCalendar = Calendar.getInstance();
+    public class CustomDialog extends Dialog implements
+            android.view.View.OnClickListener {
+
+        public Activity c;
+        public Dialog d;
+        public Button from,to,confirm;
+
+        public CustomDialog(Activity a) {
+            super(a);
+
+            this.c = a;
+        }
+
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            requestWindowFeature(Window.FEATURE_NO_TITLE);
+            setContentView(R.layout.customdialog);
+            from= (Button) findViewById(R.id.btn_yes);
+            to = (Button) findViewById(R.id.btn_no);
+            from.setOnClickListener(this);
+            confirm = (Button) findViewById(R.id.confirm);
+            confirm.setOnClickListener(this);
+            to.setOnClickListener(this);
+
+        }
+        final DatePickerDialog.OnDateSetListener date1 = new DatePickerDialog.OnDateSetListener() {
+
+            @Override
+            public void onDateSet(DatePicker view, int year, int monthOfYear,
+                                  int dayOfMonth) {
+
+                // TODO Auto-generated method stub
+                myCalendar.set(Calendar.YEAR, year);
+                myCalendar.set(Calendar.MONTH, monthOfYear);
+                myCalendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                myCalendar.set(Calendar.HOUR_OF_DAY,00);
+                myCalendar.set(Calendar.MINUTE,00);
+                myCalendar.set(Calendar.SECOND,00);
+                String myFormat = "dd/MM/yyyy"; //In which you need put here
+                SimpleDateFormat sdf = new SimpleDateFormat(myFormat, Locale.US);
+                from.setText(sdf.format(myCalendar.getTime()));
+                fromDate = myCalendar.getTime();
+            }
+
+        };
+        final DatePickerDialog.OnDateSetListener date = new DatePickerDialog.OnDateSetListener() {
+
+            @Override
+            public void onDateSet(DatePicker view, int year, int monthOfYear,
+                                  int dayOfMonth) {
+
+                // TODO Auto-generated method stub
+                myCalendar.set(Calendar.YEAR, year);
+                myCalendar.set(Calendar.MONTH, monthOfYear);
+                myCalendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                myCalendar.set(Calendar.HOUR_OF_DAY,23);
+                myCalendar.set(Calendar.MINUTE,59);
+                myCalendar.set(Calendar.SECOND,59);
+                String myFormat = "dd/MM/yyyy"; //In which you need put here
+                SimpleDateFormat sdf = new SimpleDateFormat(myFormat, Locale.US);
+                to.setText(sdf.format(myCalendar.getTime()));
+                toDate = myCalendar.getTime();
+            }
+
+        };
+        @Override
+        public void onClick(View v) {
+            switch (v.getId()) {
+                case R.id.btn_yes: {
+                    new DatePickerDialog(MainActivity.this, date1, myCalendar
+                            .get(Calendar.YEAR), myCalendar.get(Calendar.MONTH),
+                            myCalendar.get(Calendar.DAY_OF_MONTH)).show();
+                    break;
+                }
+
+                case R.id.btn_no: {
+                    new DatePickerDialog(MainActivity.this, date, myCalendar
+                            .get(Calendar.YEAR), myCalendar.get(Calendar.MONTH),
+                            myCalendar.get(Calendar.DAY_OF_MONTH)).show();
+
+                    break;
+                }
+                case R.id.confirm :
+                {
+                    if(toDate == null && fromDate == null)
+                        Toast.makeText(getApplicationContext(),"Select from and to dates", Toast.LENGTH_LONG).show();
+                    else if(toDate == null)
+                        Toast.makeText(getApplicationContext(),"Select a to date", Toast.LENGTH_LONG).show();
+                    else if(fromDate == null)
+                        Toast.makeText(getApplicationContext(),"Select a from date", Toast.LENGTH_LONG).show();
+                    else if(toDate.getTime() - fromDate.getTime() < 0)
+                        Toast.makeText(getApplicationContext(),"The to date must be later than the from date", Toast.LENGTH_LONG).show();
+                    else
+                    {
+                        dismiss();
+                        imageUri.clear();
+                        imageUriSingle.clear();
+                        imageUriGroup.clear();
+                        imageUriView.clear();
+                        imageUriRanked.clear();
+                        Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+                        Cursor cursor = getContentResolver().query(uri, new String[]{MediaStore.Images.Media.DATA}, null, null, MediaStore.Images.Media.DATE_ADDED + " ASC");
+                        if (cursor != null) {
+                            while (cursor.moveToNext()) {
+                                File file = new File(Uri.parse(cursor.getString(0)).toString());
+                                Date lastModDate = new Date(file.lastModified());
+                                Log.d("Lastmoddate",lastModDate.toString()+" "+fromDate.toString());
+                                if(lastModDate.getTime() >= fromDate.getTime() && lastModDate.getTime() <= toDate.getTime()) {
+                                    imageUri.add(Uri.parse(cursor.getString(0)));
+                                }
+                            }
+                            cursor.close();
+                        }
+                        for (Uri i : imageUri)
+                            Log.d("Photo", i.toString());
+                        allPics.setAdapter(new ImageAdapter(MainActivity.this,imageUri));
+                        singlePics.setAdapter(new ImageAdapter(MainActivity.this, imageUriSingle));
+                        groupPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriGroup));
+                        viewPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriView));
+                        Process.setEnabled(true);
+                    }
+                }
+
+                default:
+                    break;
+            }
+        }
+    }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -125,6 +265,8 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+
+
         ChoosePhoto.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -132,31 +274,9 @@ public class MainActivity extends AppCompatActivity {
                     if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                         ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, PICK_FROM_GALLERY);
                     } else {
-                        imageUri.clear();
-                        imageUriSingle.clear();
-                        imageUriGroup.clear();
-                        imageUriView.clear();
-                        imageUriRanked.clear();
-
-                        Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
-                        String today = new SimpleDateFormat("yyyyMMdd").format(new Date());
-                        Log.d("Date", today);
-                        Cursor cursor = getContentResolver().query(uri, new String[]{MediaStore.Images.Media.DATA}, null, null, MediaStore.Images.Media.DATE_ADDED + " ASC");
-                        if (cursor != null) {
-                            while (cursor.moveToNext()) {
-                                if (Uri.parse(cursor.getString(0)).toString().contains(today)) {
-                                    imageUri.add(Uri.parse(cursor.getString(0)));
-                                }
-                            }
-                            cursor.close();
-                        }
-                        for (Uri i : imageUri)
-                            Log.d("Photo", i.toString());
-                        allPics.setAdapter(new ImageAdapter(MainActivity.this,imageUri));
-                        singlePics.setAdapter(new ImageAdapter(MainActivity.this, imageUriSingle));
-                        groupPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriGroup));
-                        viewPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriView));
-                        Process.setEnabled(true);
+                        CustomDialog cdd = new CustomDialog(MainActivity.this);
+                        cdd.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                        cdd.show();
 
                     }
                 } catch (Exception e) {
@@ -197,6 +317,8 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+
+
     }
     public static String getDefaults(String key, Context context) {
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
@@ -270,7 +392,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     protected void onPreExecute() {
                         //TODO: show progress dialog
-                        progressBar.setVisibility(View.VISIBLE);
+
                     }
                     @Override
                     protected void onProgressUpdate(String... progress) {
@@ -283,8 +405,8 @@ public class MainActivity extends AppCompatActivity {
                         double score = new FaceRanking().rank(result);
                         Pair<Double,List<String>> facescore;
                         List<String> facelist = new ArrayList<String>();
-                        Log.d("FaceResult",result.length+"");
-                        if(result!= null) {
+                        //Log.d("FaceResult",result.length+"");
+                        if(result!= null && result.length>0) {
                             int baseArea = Getarea(result[0].faceRectangle.width, result[0].faceRectangle.height);
                             int fc = 0;
                             for (Face face : result) {
@@ -568,7 +690,7 @@ public class MainActivity extends AppCompatActivity {
                             viewPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriView));
                     }
                 };
-
+        progressBar.setVisibility(View.VISIBLE);
         detectTask.execute(inputStream);
     }
 
@@ -671,7 +793,7 @@ public class MainActivity extends AppCompatActivity {
                     Intent i = new Intent(MainActivity.this,TagGenerator.class);
                     String urlpath = imageUrit.get(position).toString();
                     i.putExtra("path",urlpath);
-                    if(faceidall!= null && faceidall.size()!=0) { //if faces are ranked
+                    if(faceidall!= null && faceidall.size()!=0 && faceidall.containsKey(urlpath)) { //if faces are ranked
                         i.putExtra("imagetype", faceidall.get(urlpath).second.size() + "");
                         if (faceidall.get(urlpath).second.size() == 1)
                             i.putExtra("faceid", faceidall.get(urlpath).second.get(0));

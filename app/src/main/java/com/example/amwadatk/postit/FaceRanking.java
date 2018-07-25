@@ -45,10 +45,9 @@ public class FaceRanking {
         score -= (forheadOcclusion)?5.0:0.0;
         score -= (eyeOcclusion)?3.0:0.0;
         score -= (mouthOcclusion)?2.0:0.0;
-        score += smile*5.0;
-        score += happiness*3.0;
+        score += smile*3.0;
+        score += happiness*5.0;
         score += exposure*4.0;
-        score -= blur*2.0;
         return score;
 
     }
