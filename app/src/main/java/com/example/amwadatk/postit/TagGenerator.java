@@ -20,6 +20,7 @@ import android.preference.PreferenceManager;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -36,8 +37,12 @@ import com.bumptech.glide.Glide;
 import com.google.gson.Gson;
 import com.microsoft.projectoxford.face.FaceServiceClient;
 import com.microsoft.projectoxford.face.FaceServiceRestClient;
+import com.microsoft.projectoxford.face.contract.AddPersistedFaceResult;
 import com.microsoft.projectoxford.face.contract.Candidate;
+import com.microsoft.projectoxford.face.contract.CreatePersonResult;
 import com.microsoft.projectoxford.face.contract.Face;
+import com.microsoft.projectoxford.face.contract.FaceAttribute;
+import com.microsoft.projectoxford.face.contract.FaceRectangle;
 import com.microsoft.projectoxford.face.contract.IdentifyResult;
 import com.microsoft.projectoxford.face.contract.PersonGroup;
 import com.microsoft.projectoxford.face.rest.ClientException;
@@ -79,11 +84,11 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
     Button shareimage,refresh;
     RadioButton[] rb;
     RadioGroup rg;
-    int currentquote;
+    DatabaseHandler db;
+    int currentquote,facecounter=0;
     Spinner dropdown;
     HashMap<String,List<String>> quotesList = new HashMap<>();
     List<String> quoteCat;
-    DatabaseHandler db;
     SharedPreferences sharedpreferences;
     public static Face[] faces;
     private final String apiEndpoint = "https://westcentralus.api.cognitive.microsoft.com/face/v1.0";
@@ -105,7 +110,6 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
         tags = findViewById(R.id.tags);
         currentquote =0;
         tagstext="";
-
         db = new DatabaseHandler(this);
         sharedpreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
 
@@ -251,14 +255,18 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                     protected IdentifyResult[] doInBackground(UUID[]... params) {
                         IdentifyResult[] p = null;
                         try {
-                            Log.d("person", String.valueOf(params[0].length));
+                            Log.d("typeoffaceid", String.valueOf(params[0].getClass().getName()));
                             p = faceServiceClient.identityInPersonGroup(getDefaults("personGroupId",getApplicationContext()),params[0],20);
 ;
                         } catch (ClientException e) {
                             e.printStackTrace();
+                            Log.d("Persongroupapiexc","adsf");
                         } catch (IOException e) {
                             e.printStackTrace();
+                            Log.d("Persongroupapiexce","adsf");
                         }
+                        if(p!=null)
+                        Log.d("Persongroupapi",String.valueOf(p.length));
                         return p;
                     }
 
@@ -266,6 +274,13 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                     protected void onPostExecute(IdentifyResult[] results) {
                         resultsPersons = results;
                         Log.d("KNOWNPEOPLE", String.valueOf(results));
+                        if(results==null)
+                        {
+                            for(int i=0;i<faces.length;i++)
+                            {
+                                createPersonsInGroup(i);
+                            }
+                        }
                         if(null!=resultsPersons)
                         {
                             for(int i=0; i<resultsPersons.length; ++i)
@@ -278,7 +293,6 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                                 {
                                     Log.d("GROUP","FOUND");
                                     UUID person = resultsPersons[i].candidates.get(0).personId;
-
                                     db.incrementPersonCount(String.valueOf(person));
                                 }
                             }
@@ -488,6 +502,160 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
         }
     }
 
+    private void addPersonsToGroup(Integer facenum) {
+
+
+        AsyncTask<String, Void, AddPersistedFaceResult> addPersonToGroup =
+                new AsyncTask<String, Void, AddPersistedFaceResult>() {
+                    @Override
+                    protected AddPersistedFaceResult doInBackground(String... params) {
+
+                        try {
+                            int facenum = Integer.parseInt(params[0]);
+                            Bitmap imageBitmap = BitmapFactory.decodeFile(path);
+                            java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
+                            imageBitmap.compress(Bitmap.CompressFormat.JPEG, 30, outputStream);
+                            ByteArrayInputStream inputStream =
+                                    new ByteArrayInputStream(outputStream.toByteArray());
+                            FileOutputStream out = null;
+                            try {
+                                out = new FileOutputStream("/storage/emulated/0/DCIM/output.jpg");
+                                imageBitmap.compress(Bitmap.CompressFormat.JPEG, 30, out); // bmp is your Bitmap instance
+                                // PNG is a lossless format, the compression factor (100) is ignored
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            } finally {
+                                try {
+                                    if (out != null) {
+                                        out.close();
+                                    }
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                            AddPersistedFaceResult addedPersonFace = faceServiceClient.addPersonFace(getDefaults("personGroupId", getApplicationContext()), faces[facenum].faceId, inputStream, "Adding User", faces[facenum].faceRectangle);
+                           return addedPersonFace;
+                        } catch (ClientException e) {
+                            e.printStackTrace();
+                            Log.d("ExceptionAdding","Null");
+
+                        } catch (IOException e) {
+
+                        }
+                        return null;
+                    }
+
+
+                    @Override
+                    protected void onPostExecute(AddPersistedFaceResult p) {
+
+                        if(p!=null)
+                        {
+                            Log.d("ADDEDPERSONTOGROUP","Added "+ p.persistedFaceId);
+                        }
+                        else
+                            Log.d("Error", "PesonGroupID not found");
+
+                    }
+
+
+                    @Override
+                    protected void onPreExecute() {
+
+                    }
+
+                    @Override
+                    protected void onProgressUpdate(Void... text) {
+
+                    }
+                };
+        addPersonToGroup.execute(facenum.toString());
+    }
+    private void trainPersonGroup() {
+
+        AsyncTask<String, Void,Void> trainGroup =
+                new AsyncTask<String, Void,Void>() {
+                    String exceptionMessage = "";
+
+                    @Override
+                    protected Void doInBackground(String... params) {
+                        try {
+
+                            faceServiceClient.trainPersonGroup(getDefaults("personGroupId",getApplicationContext()));
+                        } catch (ClientException e) {
+                            e.printStackTrace();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                            return null;
+                    }
+
+                    @Override
+                    protected void onPreExecute() {
+                        //TODO: show progress dialog
+
+                    }
+                    @Override
+                    protected void onProgressUpdate(Void... progress) {
+                        //TODO: update progress
+                    }
+                    @Override
+                    protected void onPostExecute(Void r) {
+                        Log.d("TrainingPersonGroup","Done");
+                        }
+                };
+
+        trainGroup.execute();
+    }
+
+    private void createPersonsInGroup(final Integer facenum) {
+
+        AsyncTask<String, Void,CreatePersonResult> createPersons =
+                new AsyncTask<String, Void,CreatePersonResult>() {
+                    String exceptionMessage = "";
+
+                    @Override
+                    protected CreatePersonResult doInBackground(String... params) {
+                        try {
+
+                           CreatePersonResult personResult = faceServiceClient.createPerson(getDefaults("personGroupId",getApplicationContext()),faces[Integer.parseInt(params[0])].faceId.toString(),"UserCreation");
+                           return personResult;
+                        } catch (ClientException e) {
+                            e.printStackTrace();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    protected void onPreExecute() {
+                        //TODO: show progress dialog
+
+                    }
+                    @Override
+                    protected void onProgressUpdate(Void... progress) {
+                        //TODO: update progress
+                    }
+                    @Override
+                    protected void onPostExecute(CreatePersonResult p)
+                    {
+                        faces[facenum].faceId = p.personId;
+                        Groupdata gd = new Groupdata(p.personId.toString());
+                        db.addPerson(gd);
+                        addPersonsToGroup(facenum);
+                        facecounter++;
+                        if(facecounter==faces.length)
+                        {
+                            trainPersonGroup();
+                        }
+
+                    }
+                };
+
+        createPersons.execute(facenum.toString());
+    }
+
     public void detectFaces()
     {
         Bitmap image = BitmapFactory.decodeFile(path);
@@ -572,6 +740,7 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                         {
                             faceIds[i] = faces[i].faceId;
                         }
+                        Log.d("NUMFACES",String.valueOf(faceIds.length));
                         getKnownPersons(faceIds);
                     }
                 };

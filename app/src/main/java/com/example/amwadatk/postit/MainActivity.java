@@ -52,6 +52,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
@@ -269,18 +270,27 @@ public class MainActivity extends AppCompatActivity {
                             addPair(3,new Pair<String, Double>(path,score));
                             imageUriView.add(Uri.parse(path));
                         } else {
-                            faceidall.put(path, result);
-                            int baseArea = Getarea(result[0].faceRectangle.width, result[0].faceRectangle.height);
-                            int fc = 0;
-                            for (Face face : result) {
 
+                            List<Integer> newfaces = new ArrayList<Integer>();
+                            int baseArea = Getarea(result[0].faceRectangle.width, result[0].faceRectangle.height);
+                            int fc = 0,facenum=0;
+                            for (Face face : result) {
+                                facenum++;
                                 FaceRectangle faceRectangle = face.faceRectangle;
                                 FaceAttribute faceAttribute = face.faceAttributes;
                                 int size = Getarea(faceRectangle.width, faceRectangle.height);
                                 if (size > 0.1 * baseArea) {
                                     fc++;
+                                    newfaces.add(facenum);
                                 }
                             }
+                            Face[] newresult = new Face[fc];
+                            facenum=0;
+                            for(Integer i : newfaces)
+                            {
+                                newresult[facenum++]=result[i];
+                            }
+                            faceidall.put(path, newresult);
                             if(fc==1) {
                                 addPair(1,new Pair<String, Double>(path,score));
                                 imageUriSingle.add(Uri.parse(path));
@@ -449,7 +459,7 @@ public class MainActivity extends AppCompatActivity {
                         if(p!=null && p.personGroupId.equals(uniqueId))
                         {
                             setDefaults("personGroupId",uniqueId,getApplicationContext());
-                            Log.d("SUCCESS","Added "+ p.personGroupId);
+                            Log.d("SUCCESS","persongroupid "+ p.personGroupId);
                         }
                         else
                             Log.d("Error", "PesonGroupID not found");
