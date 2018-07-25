@@ -190,46 +190,15 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                 if(null == faces) {
                     detectFaces();
                 }
-                if(null != faces)
+                else
                 {
                     UUID[] faceIds = new  UUID[faces.length];
                     for(int i = 0; i < faces.length ; ++i)
                     {
                         faceIds[i] = faces[i].faceId;
                     }
-                    IdentifyResult[] resultsPersonstemp = getKnownPersons(faceIds);
-                    if(null!=resultsPersonstemp)
-                    {
-                        resultsPersons = resultsPersonstemp;
-                    }
-                    if(null!=resultsPersons)
-                    {
-                        for(int i=0; i<resultsPersons.length; ++i)
-                        {
-                            if(resultsPersons[i].candidates.size() == 0)
-                            {
-                                Log.d("GROUP","NO ONE FOUND");
-                            }
-                            else
-                            {
-                                Log.d("GROUP","FOUND");
-                            }
-                        }
-                    }
+                    getKnownPersons(faceIds);
                 }
-
-                final Intent intent = new Intent(android.content.Intent.ACTION_SEND);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                intent.putExtra(Intent.EXTRA_TEXT, tags.getText().toString());
-                intent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(new File(path)));
-                intent.setType("image/jpeg");
-                ClipboardManager myClipboard;
-                myClipboard = (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-                ClipData myClip;
-                String text = tags.getText().toString();
-                myClip = ClipData.newPlainText("text", text);
-                myClipboard.setPrimaryClip(myClip);
-                startActivity(intent);
             }
         };
         shareimage.setOnClickListener(shareimg);
@@ -282,20 +251,50 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                     protected IdentifyResult[] doInBackground(UUID[]... params) {
                         IdentifyResult[] p = null;
                         try {
+                            Log.d("person", String.valueOf(params[0].length));
                             p = faceServiceClient.identityInPersonGroup(getDefaults("personGroupId",getApplicationContext()),params[0],20);
 ;
                         } catch (ClientException e) {
-
+                            e.printStackTrace();
                         } catch (IOException e) {
-
+                            e.printStackTrace();
                         }
                         return p;
                     }
 
-
                     @Override
                     protected void onPostExecute(IdentifyResult[] results) {
                         resultsPersons = results;
+                        Log.d("KNOWNPEOPLE", String.valueOf(results));
+                        if(null!=resultsPersons)
+                        {
+                            for(int i=0; i<resultsPersons.length; ++i)
+                            {
+                                if(resultsPersons[i].candidates.size() == 0)
+                                {
+                                    Log.d("GROUP","NO ONE FOUND");
+                                }
+                                else
+                                {
+                                    Log.d("GROUP","FOUND");
+                                    UUID person = resultsPersons[i].candidates.get(0).personId;
+
+                                    db.incrementPersonCount(String.valueOf(person));
+                                }
+                            }
+                        }
+                        final Intent intent = new Intent(android.content.Intent.ACTION_SEND);
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        intent.putExtra(Intent.EXTRA_TEXT, tags.getText().toString());
+                        intent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(new File(path)));
+                        intent.setType("image/jpeg");
+                        ClipboardManager myClipboard;
+                        myClipboard = (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+                        ClipData myClip;
+                        String text = tags.getText().toString();
+                        myClip = ClipData.newPlainText("text", text);
+                        myClipboard.setPrimaryClip(myClip);
+                        startActivity(intent);
                     }
 
                     @Override
@@ -568,7 +567,12 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                         //TODO: update face frames
                         Log.d("Outside API","API exit");
                         faces = result;
-
+                        UUID[] faceIds = new  UUID[faces.length];
+                        for(int i = 0; i < faces.length ; ++i)
+                        {
+                            faceIds[i] = faces[i].faceId;
+                        }
+                        getKnownPersons(faceIds);
                     }
                 };
         try {
