@@ -96,6 +96,7 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
     IdentifyResult[] resultsPersons;
 
     String numfaces="-1",faceid;
+    private ProgressDialog dialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -105,14 +106,7 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
         dropdown = findViewById(R.id.quoteCategories);
         StrictMode.setVmPolicy(newbuilder.build());
         path = getIntent().getStringExtra("path");
-//        if(getIntent().hasExtra("imagetype"))
-//        {
-//            numfaces= getIntent().getStringExtra("imagetype");
-//            Log.d("NUM",numfaces);
-//        }
-//
-//        if(getIntent().hasExtra("faceid"))
-//            faceid = getIntent().getStringExtra("faceid");
+
         Log.d("MSG",getIntent().getStringExtra("path"));
         tagImage = findViewById(R.id.tagImage);
         tags = findViewById(R.id.tags);
@@ -425,7 +419,7 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
     private class doRequest extends AsyncTask<String, String, String> {
         // Store error message
         private Exception e = null;
-        private ProgressDialog dialog;
+
 
         public doRequest() {
             dialog = new ProgressDialog(TagGenerator.this);
@@ -568,7 +562,8 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
 
                     @Override
                     protected void onPostExecute(AddPersistedFaceResult p) {
-
+                        if(dialog.isShowing())
+                            dialog.dismiss();
                         if(p!=null)
                         {
                             Log.d("ADDEDPERSONTOGROUP","Added "+ p.persistedFaceId);
@@ -581,7 +576,8 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
 
                     @Override
                     protected void onPreExecute() {
-
+                        dialog.setMessage("Generating Tags, please wait.");
+                        dialog.show();
                     }
 
                     @Override
@@ -613,7 +609,8 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                     @Override
                     protected void onPreExecute() {
                         //TODO: show progress dialog
-
+                        dialog.setMessage("Generating Tags, please wait.");
+                        dialog.show();
                     }
                     @Override
                     protected void onProgressUpdate(Void... progress) {
@@ -621,8 +618,10 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                     }
                     @Override
                     protected void onPostExecute(Void r) {
+                        if(dialog.isShowing())
+                            dialog.dismiss();
                         Log.d("TrainingPersonGroup","Done");
-                        }
+                    }
                 };
 
         trainGroup.execute();
@@ -651,6 +650,8 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                     @Override
                     protected void onPreExecute() {
                         //TODO: show progress dialog
+                        dialog.setMessage("Generating Tags, please wait.");
+                        dialog.show();
 
                     }
                     @Override
@@ -660,6 +661,10 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                     @Override
                     protected void onPostExecute(CreatePersonResult p)
                     {
+                        if(dialog.isShowing())
+                        {
+                            dialog.dismiss();
+                        }
                         faces[facenum].faceId = p.personId;
                         Groupdata gd = new Groupdata(p.personId.toString());
                         db.addPerson(gd);
@@ -743,6 +748,8 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                     @Override
                     protected void onPreExecute() {
                         //TODO: show progress dialog
+                        dialog.setMessage("Processing..");
+                        dialog.show();
                     }
 
                     @Override
@@ -762,6 +769,10 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                         }
                         Log.d("NUMFACES",String.valueOf(faceIds.length));
                         getKnownPersons(faceIds);
+                        if(dialog.isShowing())
+                        {
+                            dialog.dismiss();
+                        }
                     }
                 };
         try {
