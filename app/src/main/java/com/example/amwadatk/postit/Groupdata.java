@@ -10,7 +10,7 @@ public class Groupdata
     public Groupdata(String name)
     {
         this.name = name;
-        this.counter = 0;
+        this.counter = 1;
     }
 
     public int getCounter() {

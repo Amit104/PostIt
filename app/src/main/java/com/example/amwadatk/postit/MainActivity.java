@@ -259,8 +259,8 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     protected void onPostExecute(Face[] result) {
                         //TODO: update face frames
+                        double score = new FaceRanking(getApplicationContext()).rank(result);
 
-                        double score = new FaceRanking().rank(result);
                         Log.d("Scores : ", String.valueOf(score));
                         addPair(0,new Pair<String, Double>(path,score));
                         imageUriRanked.add(Uri.parse(path));
@@ -275,7 +275,6 @@ public class MainActivity extends AppCompatActivity {
                             int baseArea = Getarea(result[0].faceRectangle.width, result[0].faceRectangle.height);
                             int fc = 0,facenum=0;
                             for (Face face : result) {
-                                facenum++;
                                 FaceRectangle faceRectangle = face.faceRectangle;
                                 FaceAttribute faceAttribute = face.faceAttributes;
                                 int size = Getarea(faceRectangle.width, faceRectangle.height);
@@ -283,14 +282,19 @@ public class MainActivity extends AppCompatActivity {
                                     fc++;
                                     newfaces.add(facenum);
                                 }
+                                facenum++;
                             }
-                            Face[] newresult = new Face[fc];
-                            facenum=0;
-                            for(Integer i : newfaces)
+                            if(newfaces.size()>0)
                             {
-                                newresult[facenum++]=result[i];
+                                Face[] newresult = new Face[newfaces.size()];
+                                Log.d("FACESSIZE", String.valueOf(newfaces.size()) + " " + newresult.length + " " + newfaces.get(0));
+                                for(int i=0;i<newfaces.size();i++)
+                                {
+                                    newresult[i]=result[newfaces.get(i)];
+                                }
+                                faceidall.put(path, newresult);
                             }
-                            faceidall.put(path, newresult);
+
                             if(fc==1) {
                                 addPair(1,new Pair<String, Double>(path,score));
                                 imageUriSingle.add(Uri.parse(path));

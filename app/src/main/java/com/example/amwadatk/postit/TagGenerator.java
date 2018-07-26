@@ -288,12 +288,16 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                                 if(resultsPersons[i].candidates.size() == 0)
                                 {
                                     Log.d("GROUP","NO ONE FOUND");
+                                    createPersonsInGroup(i);
                                 }
                                 else
                                 {
                                     Log.d("GROUP","FOUND");
                                     UUID person = resultsPersons[i].candidates.get(0).personId;
                                     db.incrementPersonCount(String.valueOf(person));
+                                    Log.d("LISTSIZE", String.valueOf(db.getAllPersons().size()));
+                                    for(int j=0;j<db.getAllPersons().size();j++)
+                                    Log.d("LIST", String.valueOf(db.getAllPersons().get(j).name) + " " + String.valueOf(db.getAllPersons().get(j).counter));
                                 }
                             }
                         }

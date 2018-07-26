@@ -120,4 +120,15 @@ public class DatabaseHandler extends SQLiteOpenHelper {
         return cursor.getCount();
     }
 
+    public int getMaxCount() {
+        String countQuery = "SELECT  MAX("+ KEY_COUNTER +") FROM " + TABLE_GROUP ;
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery(countQuery, null);
+        cursor.moveToFirst();
+
+        int c = cursor.getInt(0);
+        cursor.close();
+        return c;
+    }
+
 }
