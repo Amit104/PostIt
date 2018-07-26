@@ -12,6 +12,8 @@ import android.graphics.BitmapFactory;
 import android.location.Address;
 import android.location.Geocoder;
 import android.media.ExifInterface;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -100,9 +102,16 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_tag_generator);
         StrictMode.VmPolicy.Builder newbuilder = new StrictMode.VmPolicy.Builder();
+        Log.d("Network state", String.valueOf(isNetworkAvailable()));
+        if(!isNetworkAvailable())
+        {
+                Toast.makeText(getApplicationContext(),"Requires Internet Connection",Toast.LENGTH_SHORT).show();
+                finish();
+        }
         dropdown = findViewById(R.id.quoteCategories);
         StrictMode.setVmPolicy(newbuilder.build());
         path = getIntent().getStringExtra("path");
@@ -253,7 +262,12 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
 
         }
     }
-
+    public boolean isNetworkAvailable() {
+        ConnectivityManager connectivityManager
+                = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+    }
     private IdentifyResult[] getKnownPersons(final UUID[] fIds) {
 
         AsyncTask<UUID[], Void, IdentifyResult[]> getKnown =
@@ -448,7 +462,6 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
             }
             return null;
         }
-
         @Override
         protected void onPostExecute(String data) {
             super.onPostExecute(data);

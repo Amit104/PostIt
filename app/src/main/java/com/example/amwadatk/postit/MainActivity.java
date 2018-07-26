@@ -14,6 +14,8 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -269,23 +271,27 @@ public class MainActivity extends AppCompatActivity {
         Process.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if(!isNetworkAvailable())
+                {
+                    Toast.makeText(getApplicationContext(),"Requires Internet Connection",Toast.LENGTH_SHORT).show();
+                    return ;
+                }
                 progressBar.setVisibility(View.VISIBLE);
                 Process.setEnabled(false);
                 ChoosePhoto.setEnabled(false);
-
+                if(imageUri.size()==0)
+                {
+                    progressBar.setVisibility(View.GONE);
+                    Process.setEnabled(true);
+                    ChoosePhoto.setEnabled(true);
+                    Toast.makeText(MainActivity.this,"No Images available!!", Toast.LENGTH_LONG).show();
+                    return;
+                }
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
                         try {
-                            if(imageUri.size()==0)
-                            {
-                                progressBar.setVisibility(View.GONE);
-                                Process.setEnabled(true);
-                                ChoosePhoto.setEnabled(true);
-                                Toast.makeText(MainActivity.this,"No Images available!!", Toast.LENGTH_LONG).show();
-                            }
-                            else
-                            {
+
                                 imageUriRanked.clear();
                                 imageUriView.clear();
                                 imageUriGroup.clear();
@@ -296,7 +302,7 @@ public class MainActivity extends AppCompatActivity {
                                     Bitmap image = BitmapFactory.decodeFile(i.toString());
                                     detectAndFrame(image, i.toString());
                                 }
-                            }
+
                         } catch (Exception e) {
 
                         }
@@ -446,7 +452,12 @@ public class MainActivity extends AppCompatActivity {
                 };
         detectTask.execute(inputStream);
     }
-
+    public boolean isNetworkAvailable() {
+        ConnectivityManager connectivityManager
+                = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+    }
     public void addPair(int group, Pair<String, Double> newitem)
     {
         if(group==0)
