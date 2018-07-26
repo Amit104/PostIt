@@ -14,9 +14,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
-import android.icu.text.StringSearch;
 import android.net.Uri;
-import android.nfc.Tag;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -58,7 +56,6 @@ import java.util.Calendar;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -293,31 +290,62 @@ public class MainActivity extends AppCompatActivity {
                 progressBar.setVisibility(View.VISIBLE);
                 Process.setEnabled(false);
                 ChoosePhoto.setEnabled(false);
-                if(imageUri.size()==0)
-                {
-                    progressBar.setVisibility(View.GONE);
-                    Process.setEnabled(true);
-                    ChoosePhoto.setEnabled(true);
-                    Toast.makeText(MainActivity.this,"No Images available!!", Toast.LENGTH_LONG).show();
-                }
-                else
-                {
-                    imageUriRanked.clear();
-                    imageUriView.clear();
-                    imageUriGroup.clear();
-                    imageUriSingle.clear();
-                    counter=0;
-                    for(Uri i : imageUri)
-                    {
-                        Bitmap image = BitmapFactory.decodeFile(i.toString());
-                        detectAndFrame(image, i.toString());
-                    }
 
-                }
+                AsyncTask<Void, Void, Void> rank =
+                        new AsyncTask<Void, Void, Void>() {
+                            String exceptionMessage = "";
+
+                            @Override
+                            protected Void doInBackground(Void... voids) {
+                                try {
+                                    if(imageUri.size()==0)
+                                    {
+                                        progressBar.setVisibility(View.GONE);
+                                        Process.setEnabled(true);
+                                        ChoosePhoto.setEnabled(true);
+                                        Toast.makeText(MainActivity.this,"No Images available!!", Toast.LENGTH_LONG).show();
+                                    }
+                                    else
+                                    {
+                                        imageUriRanked.clear();
+                                        imageUriView.clear();
+                                        imageUriGroup.clear();
+                                        imageUriSingle.clear();
+                                        counter=0;
+                                        for(Uri i : imageUri)
+                                        {
+                                            Bitmap image = BitmapFactory.decodeFile(i.toString());
+                                            detectAndFrame(image, i.toString());
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    exceptionMessage = String.format(
+                                            "Couldn't rank photos %s", e.getMessage());
+                                }
+                                return null;
+                            }
+
+
+                            @Override
+                            protected void onPreExecute() {
+                                //TODO: show progress dialog
+                            }
+                            @Override
+                            protected void onProgressUpdate(Void... voids) {
+                                //TODO: update progress
+                            }
+                            @Override
+                            protected void onPostExecute(Void t) {
+                                //TODO: update face frames
+                                progressBar.setVisibility(View.GONE);
+
+                            }
+                        };
+                Executor exec = AsyncTask.THREAD_POOL_EXECUTOR;
+                rank.executeOnExecutor(exec);
             }
+
         });
-
-
     }
     public static String getDefaults(String key, Context context) {
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
