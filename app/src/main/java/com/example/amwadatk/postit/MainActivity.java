@@ -273,29 +273,35 @@ public class MainActivity extends AppCompatActivity {
                 Process.setEnabled(false);
                 ChoosePhoto.setEnabled(false);
 
-                try {
-                    if(imageUri.size()==0)
-                    {
-                        progressBar.setVisibility(View.GONE);
-                        Process.setEnabled(true);
-                        ChoosePhoto.setEnabled(true);
-                        Toast.makeText(MainActivity.this,"No Images available!!", Toast.LENGTH_LONG).show();
-                    }
-                    else
-                    {
-                        imageUriRanked.clear();
-                        imageUriView.clear();
-                        imageUriGroup.clear();
-                        imageUriSingle.clear();
-                        counter=0;
-                        for(Uri i : imageUri)
-                        {
-                            Bitmap image = BitmapFactory.decodeFile(i.toString());
-                            detectAndFrame(image, i.toString());
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            if(imageUri.size()==0)
+                            {
+                                progressBar.setVisibility(View.GONE);
+                                Process.setEnabled(true);
+                                ChoosePhoto.setEnabled(true);
+                                Toast.makeText(MainActivity.this,"No Images available!!", Toast.LENGTH_LONG).show();
+                            }
+                            else
+                            {
+                                imageUriRanked.clear();
+                                imageUriView.clear();
+                                imageUriGroup.clear();
+                                imageUriSingle.clear();
+                                counter=0;
+                                for(Uri i : imageUri)
+                                {
+                                    Bitmap image = BitmapFactory.decodeFile(i.toString());
+                                    detectAndFrame(image, i.toString());
+                                }
+                            }
+                        } catch (Exception e) {
+
                         }
                     }
-                } catch (Exception e) {
-                }
+                }).start();
             }
 
         });
