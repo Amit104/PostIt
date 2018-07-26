@@ -2,65 +2,72 @@ package com.example.amwadatk.postit;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.ProgressDialog;
+import android.app.DatePickerDialog;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
-import com.microsoft.projectoxford.face.*;
-import com.microsoft.projectoxford.face.contract.*;
-
-import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteException;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
+import android.view.Window;
 import android.widget.BaseAdapter;
 import android.widget.Button;
+import android.widget.DatePicker;
 import android.widget.GridView;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
+import com.microsoft.projectoxford.face.FaceServiceClient;
+import com.microsoft.projectoxford.face.FaceServiceRestClient;
+import com.microsoft.projectoxford.face.contract.Face;
+import com.microsoft.projectoxford.face.contract.FaceAttribute;
+import com.microsoft.projectoxford.face.contract.FaceRectangle;
+import com.microsoft.projectoxford.face.contract.PersonGroup;
 import com.microsoft.projectoxford.face.rest.ClientException;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Array;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+
 
 public class MainActivity extends AppCompatActivity {
 
     Button ChoosePhoto,Process;
     ExpandableHeightGridView singlePics,groupPics,viewPics,allPics;
     int counter;
+    String userfaceid="";
+    Date fromDate = null, toDate = null;
     ProgressBar progressBar;
     ArrayList<Uri> imageUri = new ArrayList<Uri>();
     ArrayList<Uri> imageUriRanked = new ArrayList<Uri>();
@@ -80,6 +87,137 @@ public class MainActivity extends AppCompatActivity {
     SharedPreferences sharedpreferences;
     HashMap<String,Face[]> faceidall = new HashMap<>();
 
+    Calendar myCalendar = Calendar.getInstance();
+
+    public class CustomDialog extends Dialog implements
+            android.view.View.OnClickListener {
+
+        public Activity c;
+        public Dialog d;
+        public Button from,to,confirm;
+
+        public CustomDialog(Activity a) {
+            super(a);
+
+            this.c = a;
+        }
+
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            requestWindowFeature(Window.FEATURE_NO_TITLE);
+            setContentView(R.layout.customdialog);
+            from= (Button) findViewById(R.id.btn_yes);
+            to = (Button) findViewById(R.id.btn_no);
+            from.setOnClickListener(this);
+            confirm = findViewById(R.id.confirm);
+            confirm.setOnClickListener(this);
+            to.setOnClickListener(this);
+
+        }
+        final DatePickerDialog.OnDateSetListener date1 = new DatePickerDialog.OnDateSetListener() {
+
+            @Override
+            public void onDateSet(DatePicker view, int year, int monthOfYear,
+                                  int dayOfMonth) {
+
+                // TODO Auto-generated method stub
+                myCalendar.set(Calendar.YEAR, year);
+                myCalendar.set(Calendar.MONTH, monthOfYear);
+                myCalendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                myCalendar.set(Calendar.HOUR_OF_DAY,00);
+                myCalendar.set(Calendar.MINUTE,00);
+                myCalendar.set(Calendar.SECOND,00);
+                String myFormat = "dd/MM/yyyy"; //In which you need put here
+                SimpleDateFormat sdf = new SimpleDateFormat(myFormat, Locale.US);
+                from.setText(sdf.format(myCalendar.getTime()));
+                fromDate = myCalendar.getTime();
+            }
+
+        };
+        final DatePickerDialog.OnDateSetListener date = new DatePickerDialog.OnDateSetListener() {
+
+            @Override
+            public void onDateSet(DatePicker view, int year, int monthOfYear,
+                                  int dayOfMonth) {
+
+                // TODO Auto-generated method stub
+                myCalendar.set(Calendar.YEAR, year);
+                myCalendar.set(Calendar.MONTH, monthOfYear);
+                myCalendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                myCalendar.set(Calendar.HOUR_OF_DAY,23);
+                myCalendar.set(Calendar.MINUTE,59);
+                myCalendar.set(Calendar.SECOND,59);
+                String myFormat = "dd/MM/yyyy"; //In which you need put here
+                SimpleDateFormat sdf = new SimpleDateFormat(myFormat, Locale.US);
+                to.setText(sdf.format(myCalendar.getTime()));
+                toDate = myCalendar.getTime();
+            }
+
+        };
+        @Override
+        public void onClick(View v) {
+            switch (v.getId()) {
+                case R.id.btn_yes: {
+                    new DatePickerDialog(MainActivity.this, date1, myCalendar
+                            .get(Calendar.YEAR), myCalendar.get(Calendar.MONTH),
+                            myCalendar.get(Calendar.DAY_OF_MONTH)).show();
+                    break;
+                }
+
+                case R.id.btn_no: {
+                    new DatePickerDialog(MainActivity.this, date, myCalendar
+                            .get(Calendar.YEAR), myCalendar.get(Calendar.MONTH),
+                            myCalendar.get(Calendar.DAY_OF_MONTH)).show();
+
+                    break;
+                }
+                case R.id.confirm :
+                {
+                    if(toDate == null && fromDate == null)
+                        Toast.makeText(getApplicationContext(),"Select from and to dates", Toast.LENGTH_LONG).show();
+                    else if(toDate == null)
+                        Toast.makeText(getApplicationContext(),"Select a to date", Toast.LENGTH_LONG).show();
+                    else if(fromDate == null)
+                        Toast.makeText(getApplicationContext(),"Select a from date", Toast.LENGTH_LONG).show();
+                    else if(toDate.getTime() - fromDate.getTime() < 0)
+                        Toast.makeText(getApplicationContext(),"The to date must be later than the from date", Toast.LENGTH_LONG).show();
+                    else
+                    {
+                        dismiss();
+                        imageUri.clear();
+                        imageUriSingle.clear();
+                        imageUriGroup.clear();
+                        imageUriView.clear();
+                        imageUriRanked.clear();
+                        Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+                        Cursor cursor = getContentResolver().query(uri, new String[]{MediaStore.Images.Media.DATA}, null, null, MediaStore.Images.Media.DATE_ADDED + " ASC");
+                        if (cursor != null) {
+                            while (cursor.moveToNext()) {
+                                File file = new File(Uri.parse(cursor.getString(0)).toString());
+                                Date lastModDate = new Date(file.lastModified());
+                                Log.d("Lastmoddate",lastModDate.toString()+" "+fromDate.toString());
+                                if(lastModDate.getTime() >= fromDate.getTime() && lastModDate.getTime() <= toDate.getTime()) {
+                                    imageUri.add(Uri.parse(cursor.getString(0)));
+                                }
+                            }
+                            cursor.close();
+                        }
+                        for (Uri i : imageUri)
+                            Log.d("Photo", i.toString());
+                        allPics.setAdapter(new ImageAdapter(MainActivity.this,imageUri));
+                        singlePics.setAdapter(new ImageAdapter(MainActivity.this, imageUriSingle));
+                        groupPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriGroup));
+                        viewPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriView));
+                        Process.setEnabled(true);
+                    }
+                }
+
+                default:
+                    break;
+            }
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -109,7 +247,6 @@ public class MainActivity extends AppCompatActivity {
             CreateGroup(uniqueID);
         }
 
-
         ChoosePhoto.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -117,31 +254,9 @@ public class MainActivity extends AppCompatActivity {
                     if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                         ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, PICK_FROM_GALLERY);
                     } else {
-                        imageUri.clear();
-                        imageUriSingle.clear();
-                        imageUriGroup.clear();
-                        imageUriView.clear();
-                        imageUriRanked.clear();
-
-                        Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
-                        String today = new SimpleDateFormat("yyyyMMdd").format(new Date());
-                        Log.d("Date", today);
-                        Cursor cursor = getContentResolver().query(uri, new String[]{MediaStore.Images.Media.DATA}, null, null, MediaStore.Images.Media.DATE_ADDED + " ASC");
-                        if (cursor != null) {
-                            while (cursor.moveToNext()) {
-                                if (Uri.parse(cursor.getString(0)).toString().contains(today)) {
-                                    imageUri.add(Uri.parse(cursor.getString(0)));
-                                }
-                            }
-                            cursor.close();
-                        }
-                        for (Uri i : imageUri)
-                            Log.d("Photo", i.toString());
-                        allPics.setAdapter(new ImageAdapter(MainActivity.this,imageUri));
-                        singlePics.setAdapter(new ImageAdapter(MainActivity.this, imageUriSingle));
-                        groupPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriGroup));
-                        viewPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriView));
-                        Process.setEnabled(true);
+                        CustomDialog cdd = new CustomDialog(MainActivity.this);
+                        cdd.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                        cdd.show();
 
                     }
                 } catch (Exception e) {
@@ -154,36 +269,41 @@ public class MainActivity extends AppCompatActivity {
         Process.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
                 progressBar.setVisibility(View.VISIBLE);
                 Process.setEnabled(false);
                 ChoosePhoto.setEnabled(false);
 
-                if(imageUri.size()==0)
-                {
-                    progressBar.setVisibility(View.GONE);
-                    Process.setEnabled(true);
-                    ChoosePhoto.setEnabled(true);
-                    Toast.makeText(MainActivity.this,"No Images available!!", Toast.LENGTH_LONG).show();
-                }
-                else
-                {
-                    imageUriRanked.clear();
-                    imageUriView.clear();
-                    imageUriGroup.clear();
-                    imageUriSingle.clear();
-                    counter=0;
-                    for(Uri i : imageUri)
+                try {
+                    if(imageUri.size()==0)
                     {
-                        Bitmap image = BitmapFactory.decodeFile(i.toString());
-                        detectAndFrame(image, i.toString());
+                        progressBar.setVisibility(View.GONE);
+                        Process.setEnabled(true);
+                        ChoosePhoto.setEnabled(true);
+                        Toast.makeText(MainActivity.this,"No Images available!!", Toast.LENGTH_LONG).show();
                     }
-
+                    else
+                    {
+                        imageUriRanked.clear();
+                        imageUriView.clear();
+                        imageUriGroup.clear();
+                        imageUriSingle.clear();
+                        counter=0;
+                        for(Uri i : imageUri)
+                        {
+                            Bitmap image = BitmapFactory.decodeFile(i.toString());
+                            detectAndFrame(image, i.toString());
+                        }
+                    }
+                } catch (Exception e) {
                 }
             }
+
         });
     }
-
+    public static String getDefaults(String key, Context context) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        return preferences.getString(key, null);
+    }
 
     private void detectAndFrame(final Bitmap imageBitmap, final String path) {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -215,8 +335,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     protected Face[] doInBackground(InputStream... params) {
                         try {
-                            publishProgress("Detecting...");
-                            Face[] result = faceServiceClient.detect(
+                                    Face[] result = faceServiceClient.detect(
                                     params[0],
                                     true,         // returnFaceId
                                     false,        // returnFaceLandmarks
@@ -250,7 +369,6 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     protected void onPreExecute() {
                         //TODO: show progress dialog
-                        progressBar.setVisibility(View.VISIBLE);
                     }
                     @Override
                     protected void onProgressUpdate(String... progress) {
@@ -262,12 +380,12 @@ public class MainActivity extends AppCompatActivity {
                         double score = new FaceRanking(getApplicationContext()).rank(result);
 
                         Log.d("Scores : ", String.valueOf(score));
-                        addPair(0,new Pair<String, Double>(path,score));
+                        addPair(0, new Pair<>(path, score));
                         imageUriRanked.add(Uri.parse(path));
 
                         // add conditions here
                         if(result==null || result.length==0) {
-                            addPair(3,new Pair<String, Double>(path,score));
+                            addPair(3, new Pair<>(path, score));
                             imageUriView.add(Uri.parse(path));
                         } else {
 
@@ -303,7 +421,6 @@ public class MainActivity extends AppCompatActivity {
                                 imageUriGroup.add(Uri.parse(path));
                             }
                         }
-
                         counter++;
                         if(counter==imageUri.size()) {
                             Process.setEnabled(true);
@@ -314,13 +431,13 @@ public class MainActivity extends AppCompatActivity {
                             progressBar.setVisibility(View.GONE);
                         }
 
-                            allPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriRanked));
-                            singlePics.setAdapter(new ImageAdapter(MainActivity.this, imageUriSingle));
-                            groupPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriGroup));
-                            viewPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriView));
+                        allPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriRanked));
+                        singlePics.setAdapter(new ImageAdapter(MainActivity.this, imageUriSingle));
+                        groupPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriGroup));
+                        viewPics.setAdapter(new ImageAdapter(MainActivity.this, imageUriView));
+
                     }
                 };
-
         detectTask.execute(inputStream);
     }
 
@@ -381,10 +498,6 @@ public class MainActivity extends AppCompatActivity {
                 .create().show();
     }
 
-    public static String getDefaults(String key, Context context) {
-        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
-        return preferences.getString(key, null);
-    }
 
     public static void setDefaults(String key, String value, Context context) {
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
@@ -484,7 +597,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class ImageAdapter extends BaseAdapter {
-
         private Activity context;
         private ArrayList<Uri> imageUrit;
 

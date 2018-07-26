@@ -1,5 +1,6 @@
 package com.example.amwadatk.postit;
 
+import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -14,13 +15,12 @@ import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.app.Activity;
 import android.os.StrictMode;
 import android.preference.PreferenceManager;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Base64;
 import android.util.Log;
-import android.util.Pair;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -38,13 +38,9 @@ import com.google.gson.Gson;
 import com.microsoft.projectoxford.face.FaceServiceClient;
 import com.microsoft.projectoxford.face.FaceServiceRestClient;
 import com.microsoft.projectoxford.face.contract.AddPersistedFaceResult;
-import com.microsoft.projectoxford.face.contract.Candidate;
 import com.microsoft.projectoxford.face.contract.CreatePersonResult;
 import com.microsoft.projectoxford.face.contract.Face;
-import com.microsoft.projectoxford.face.contract.FaceAttribute;
-import com.microsoft.projectoxford.face.contract.FaceRectangle;
 import com.microsoft.projectoxford.face.contract.IdentifyResult;
-import com.microsoft.projectoxford.face.contract.PersonGroup;
 import com.microsoft.projectoxford.face.rest.ClientException;
 import com.microsoft.projectoxford.vision.VisionServiceClient;
 import com.microsoft.projectoxford.vision.VisionServiceRestClient;
@@ -62,8 +58,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -97,6 +95,8 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
             new FaceServiceRestClient(apiEndpoint, subscriptionKey);
     IdentifyResult[] resultsPersons;
 
+    String numfaces="-1",faceid;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -105,6 +105,14 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
         dropdown = findViewById(R.id.quoteCategories);
         StrictMode.setVmPolicy(newbuilder.build());
         path = getIntent().getStringExtra("path");
+//        if(getIntent().hasExtra("imagetype"))
+//        {
+//            numfaces= getIntent().getStringExtra("imagetype");
+//            Log.d("NUM",numfaces);
+//        }
+//
+//        if(getIntent().hasExtra("faceid"))
+//            faceid = getIntent().getStringExtra("faceid");
         Log.d("MSG",getIntent().getStringExtra("path"));
         tagImage = findViewById(R.id.tagImage);
         tags = findViewById(R.id.tags);
@@ -151,7 +159,7 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
             public void afterTextChanged(Editable s)
             {
                     String changed = tags.getText().toString();
-                    if(changed.contains(tagstext)==false)
+                    if(!changed.contains(tagstext))
                     {
                         RadioButton  rb = findViewById(currentquote);
                         tagstext = tagstext.substring(0,changed.indexOf(rb.getText().toString()));
@@ -244,7 +252,6 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
 
         }
     }
-
 
     private IdentifyResult[] getKnownPersons(final UUID[] fIds) {
 
@@ -397,6 +404,15 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
     public static String getDefaults(String key, Context context) {
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         return preferences.getString(key, null);
+    }
+
+    String ConvertfacetoString(String urlpath)
+    {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        Bitmap bitmap = BitmapFactory.decodeFile(urlpath);
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+        byte[] imageBytes = baos.toByteArray();
+        return Base64.encodeToString(imageBytes, Base64.DEFAULT);
     }
 
     public static void setDefaults(String key, String value, Context context) {

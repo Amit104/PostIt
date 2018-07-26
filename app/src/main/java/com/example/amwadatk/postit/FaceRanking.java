@@ -1,10 +1,8 @@
 package com.example.amwadatk.postit;
 
 import android.content.Context;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.util.Log;
-import android.util.Pair;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -46,7 +44,7 @@ public class FaceRanking {
     public double rank(Face[] faces) {
         if(faces!= null){
 
-            if(faces==null || faces.length==0) {
+            if(faces.length==0) {
                 // this is fine
             } else {
 
@@ -57,6 +55,7 @@ public class FaceRanking {
                     FaceRectangle faceRectangle = face.faceRectangle;
                     FaceAttribute faceAttribute = face.faceAttributes;
                     int size = Getarea(faceRectangle.width, faceRectangle.height);
+                    Log.d("FACES", String.valueOf(fc));
                     if (size > 0.1 * baseArea) {
                         fc++;
                         newfaces.add(facenum);
@@ -72,26 +71,26 @@ public class FaceRanking {
                         faceidall[i]=faces[newfaces.get(i)];
                     }
                 }
-            }
 
-            for (Face face:faceidall){
+                for (Face face:faceidall){
 
-                FaceRectangle faceRectangle = face.faceRectangle;
-                FaceAttribute faceAttribute = face.faceAttributes;
-                int size = Getarea(faceRectangle.width,faceRectangle.height);
-                totalSize = totalSize + size;
-                score += GetScore(faceAttribute.smile,faceAttribute.emotion.happiness,faceAttribute.exposure.value
-                                    ,faceAttribute.blur.value,faceAttribute.occlusion.foreheadOccluded,
-                                    faceAttribute.occlusion.eyeOccluded,faceAttribute.occlusion.mouthOccluded)*size;
+                    FaceRectangle faceRectangle = face.faceRectangle;
+                    FaceAttribute faceAttribute = face.faceAttributes;
+                    int size = Getarea(faceRectangle.width,faceRectangle.height);
+                    totalSize = totalSize + size;
+                    score += GetScore(face.faceId, size, faceAttribute.smile,faceAttribute.emotion.happiness,faceAttribute.exposure.value
+                            ,faceAttribute.blur.value,faceAttribute.occlusion.foreheadOccluded,
+                            faceAttribute.occlusion.eyeOccluded,faceAttribute.occlusion.mouthOccluded)*size;
 
+                }
+                finalScore = score/totalSize;
+                UUID[] faceIds = new  UUID[faceidall.length];
+                for(int i = 0; i < faceidall.length ; ++i)
+                {
+                    faceIds[i] = faceidall[i].faceId;
+                }
+                return getKnownPersons(faceIds);
             }
-            finalScore = score/totalSize;
-            UUID[] faceIds = new  UUID[faceidall.length];
-            for(int i = 0; i < faceidall.length ; ++i)
-            {
-                faceIds[i] = faceidall[i].faceId;
-            }
-            return getKnownPersons(faceIds);
         }
         return -50.0;
     }
@@ -100,17 +99,17 @@ public class FaceRanking {
         return width*height;
     }
 
-    public double GetScore(double smile, double happiness, double exposure, double blur,
-                          boolean forheadOcclusion, boolean eyeOcclusion, boolean mouthOcclusion){
+    public double GetScore(UUID faceId, int size, double smile, double happiness, double exposure, double blur,
+                           boolean forheadOcclusion, boolean eyeOcclusion, boolean mouthOcclusion){
         double score = 0;
         score -= (forheadOcclusion)?5.0:0.0;
         score -= (eyeOcclusion)?3.0:0.0;
         score -= (mouthOcclusion)?2.0:0.0;
-        score += smile*5.0;
-        score += happiness*3.0;
+        score += smile*3.0;
+        score += happiness*5.0;
         score += exposure*4.0;
-        score -= blur*2.0;
         return score;
+
     }
     private double getKnownPersons(final UUID[] fIds) {
 
