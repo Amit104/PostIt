@@ -324,7 +324,7 @@ public class MainActivity extends AppCompatActivity {
                 new ByteArrayInputStream(outputStream.toByteArray());
         FileOutputStream out = null;
         try {
-            out = new FileOutputStream("/storage/emulated/0/DCIM/output.jpg");
+            //out = new FileOutputStream("/storage/emulated/0/DCIM/output.jpg");
             imageBitmap.compress(Bitmap.CompressFormat.JPEG, 30, out); // bmp is your Bitmap instance
             // PNG is a lossless format, the compression factor (100) is ignored
         } catch (Exception e) {

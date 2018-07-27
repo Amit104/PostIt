@@ -19,6 +19,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.StrictMode;
 import android.preference.PreferenceManager;
+import android.telecom.Call;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Base64;
@@ -37,11 +38,15 @@ import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonParser;
 import com.microsoft.projectoxford.face.FaceServiceClient;
 import com.microsoft.projectoxford.face.FaceServiceRestClient;
 import com.microsoft.projectoxford.face.contract.AddPersistedFaceResult;
 import com.microsoft.projectoxford.face.contract.CreatePersonResult;
 import com.microsoft.projectoxford.face.contract.Face;
+import com.microsoft.projectoxford.face.contract.FaceAttribute;
+import com.microsoft.projectoxford.face.contract.FaceRectangle;
 import com.microsoft.projectoxford.face.contract.IdentifyResult;
 import com.microsoft.projectoxford.face.rest.ClientException;
 import com.microsoft.projectoxford.vision.VisionServiceClient;
@@ -52,6 +57,9 @@ import com.microsoft.projectoxford.vision.contract.Tag;
 import com.microsoft.projectoxford.vision.rest.VisionServiceException;
 
 import org.apache.commons.io.output.ByteArrayOutputStream;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -70,6 +78,8 @@ import java.util.Locale;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class TagGenerator extends Activity implements AdapterView.OnItemSelectedListener {
@@ -99,6 +109,7 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
 
     String numfaces="-1",faceid;
     private ProgressDialog dialog;
+    List<String> exclude = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -123,7 +134,17 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
         tagstext="";
         db = new DatabaseHandler(this);
         sharedpreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-
+        exclude.add("man");
+        exclude.add("person");
+        exclude.add("male");
+        exclude.add("female");
+        exclude.add("shirt");
+        exclude.add("wall");
+        exclude.add("ceiling");
+        exclude.add("furniture");
+        exclude.add("cellphone");
+        exclude.add("phone");
+        exclude.add("woman");
         try{
             InputStreamReader is = new InputStreamReader(getAssets()
                     .open("quotes.csv"));
@@ -207,10 +228,12 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                     @Override
                     public void run() {
                         if(null == faces) {
+                            Log.d("SHARE","1");
                             detectFaces();
                         }
                         else
                         {
+                            Log.d("SHARE","2");
                             UUID[] faceIds = new  UUID[faces.length];
                             for(int i = 0; i < faces.length ; ++i)
                             {
@@ -298,12 +321,13 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                         Log.d("KNOWNPEOPLE", String.valueOf(results));
                         if(results==null)
                         {
-                            for(int i=0;i<faces.length;i++)
-                            {
-                                createPersonsInGroup(i);
-                            }
+                            if(faces!=null)
+                                for(int i=0;i<faces.length;i++)
+                                {
+                                    createPersonsInGroup(i);
+                                }
                         }
-                        if(null!=resultsPersons)
+                        else
                         {
                             for(int i=0; i<resultsPersons.length; ++i)
                             {
@@ -320,8 +344,10 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                                     Log.d("LISTSIZE", String.valueOf(db.getAllPersons().size()));
                                     for(int j=0;j<db.getAllPersons().size();j++)
                                     Log.d("LIST", String.valueOf(db.getAllPersons().get(j).name) + " " + String.valueOf(db.getAllPersons().get(j).counter));
+                                   // addPersonsToGroup(i);
                                 }
                             }
+                            //trainPersonGroup();
                         }
                         final Intent intent = new Intent(android.content.Intent.ACTION_SEND);
                         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -468,17 +494,39 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
 
             if (e != null) {
 
-                tags.setText("Error: " + e.getMessage());
+                tags.setText("Li");
                 this.e = null;
             } else {
                 Gson gson = new Gson();
                 AnalysisResult result = gson.fromJson(data, AnalysisResult.class);
-
                 tags.append(cityName+" ");
+
+                for(Category cat : result.categories)
+                {
+                    if(cat!=null && cat.detail!=null)
+                    {
+                        Log.d("Details", String.valueOf(cat.detail));
+                        try {
+                            String mydata = String.valueOf(cat.detail);
+                            Pattern pattern = Pattern.compile("name=(.*?),");
+                            Matcher matcher = pattern.matcher(mydata);
+                            if (matcher.find())
+                            {
+                                Log.d("MATCH",matcher.group(1));
+                                tags.append("#" + matcher.group(1) + " " );
+                            }
+                        } catch (Exception e1) {
+                            e1.printStackTrace();
+                        }
+                    }
+                }
+
                 for (Tag tag: result.tags) {
-                    tags.append("#" + tag.name + " " );
+                    if(!exclude.contains(tag.name))
+                        tags.append("#" + tag.name + " " );
                     //write logic for captions
                 }
+
                 tags.append("\n");
                 double maxScore = 0.0;
                 String temp = "";
@@ -489,45 +537,6 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                     }
                 }
                 //tags.append("Category: " + temp + ", score: " + maxScore + "\n");
-                ArrayList<String> food = new ArrayList<String>();
-                food.add("Food is Lovveeeeeeeeeeeeee!!!!!");
-                food.add("The only thing I like better than talking about Food is eating");
-                food.add("The closest I’ve been to a diet this year is erasing food searches from my browser history ");
-                food.add("Good food is good mood ");
-                food.add("Count the memories not the calories ");
-                food.add("If it doesn't involve food, I'm not going ");
-                food.add("You can’t live a full life on an empty stomach ");
-
-                ArrayList<String> people = new ArrayList<String>();
-                people.add("I would rather walk with a friend in the dark, than alone in the light");
-                people.add("I’m not perfect. I’ll annoy you, make fun of you, say stupid things, but you’ll never find someone who loves you as much as I do. ");
-                people.add("This is to the Echos of our laughter. The looks That we Share. The never ending gossips. and the Sudden amazing get aways. This is to our Past And This is to Our Future. This is to our Friendship that will Never Fade");
-                people.add("The most important thing in the world is family and love.\n");
-                people.add("Smile a little more, regret a little less ");
-                people.add("Beauty is power; a smile is it’s sword ");
-                people.add("Lighten up, just enjoy life, smile more, laugh more, and don't get so worked up about things.\n");
-
-                ArrayList<String> outdoor = new ArrayList<String>();
-                outdoor.add("Look deep into nature and then you will understand everything better ");
-                outdoor.add("To walk in nature is to witness a thousand miracles ");
-                outdoor.add("Difficult roads often lead to beautiful destinations ");
-                outdoor.add("Nature is not a place to visit. It’s home ");
-                outdoor.add("In every walk with nature, one receives far more than he seeks ");
-
-
-                ArrayList<String> others = new ArrayList<String>();
-                others.add("Fill your life with adventures, not things. Have stories to tell, not stuff to show");
-                others.add("Life is short there is no time to leave important words unsaid");
-                others.add("Sometimes you have to go up really high to understand how small you really are");
-                others.add("Do not take life too seriously. You will never get out of it alive ");
-                others.add("When you actually matter to a person, they’ll make time for you. No lies, No excuses ");
-
-                int faceCount = 0;
-                Collections.shuffle(food);
-                Collections.shuffle(others);
-                Collections.shuffle(outdoor);
-                Collections.shuffle(people);
-
                 tagstext =tags.getText().toString();
             }
             if (dialog.isShowing()) {
@@ -766,7 +775,45 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                     protected void onPostExecute(Face[] result) {
                         //TODO: update face frames
                         Log.d("Outside API","API exit");
-                        faces = result;
+                        if(result==null || result.length==0)
+                        {
+                            final Intent intent = new Intent(android.content.Intent.ACTION_SEND);
+                            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            intent.putExtra(Intent.EXTRA_TEXT, tags.getText().toString());
+                            intent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(new File(path)));
+                            intent.setType("image/jpeg");
+                            ClipboardManager myClipboard;
+                            myClipboard = (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+                            ClipData myClip;
+                            shareimage.setEnabled(true);
+                            String text = tags.getText().toString();
+                            myClip = ClipData.newPlainText("text", text);
+                            myClipboard.setPrimaryClip(myClip);
+                            startActivity(intent);
+                            return;
+                        }
+                        List<Integer> newfaces = new ArrayList<Integer>();
+                        int baseArea = Getarea(result[0].faceRectangle.width, result[0].faceRectangle.height);
+                        int fc = 0,facenum=0;
+                        for (Face face : result) {
+                            FaceRectangle faceRectangle = face.faceRectangle;
+                            FaceAttribute faceAttribute = face.faceAttributes;
+                            int size = Getarea(faceRectangle.width, faceRectangle.height);
+                            Log.d("FACES", String.valueOf(fc));
+                            if (size > 0.1 * baseArea) {
+                                fc++;
+                                newfaces.add(facenum);
+                            }
+                            facenum++;
+                        }
+                        if(newfaces.size()>0)
+                        {
+                            faces = new Face[newfaces.size()];
+                            for(int i=0;i<newfaces.size();i++)
+                            {
+                                faces[i]=result[newfaces.get(i)];
+                            }
+                        }
                         UUID[] faceIds = new  UUID[faces.length];
                         for(int i = 0; i < faces.length ; ++i)
                         {
@@ -774,7 +821,6 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
                         }
                         Log.d("NUMFACES",String.valueOf(faceIds.length));
                         getKnownPersons(faceIds);
-
                     }
                 };
         try {
@@ -784,5 +830,8 @@ public class TagGenerator extends Activity implements AdapterView.OnItemSelected
         } catch (ExecutionException e) {
             e.printStackTrace();
         }
+    }
+    public int Getarea(int width, int height){
+        return width*height;
     }
 }
